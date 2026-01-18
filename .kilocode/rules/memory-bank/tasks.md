@@ -9,17 +9,19 @@
 
 **Steps:**
 1. Ensure RimWorld has autosaved recently (or manual save)
-2. Run extractor against target save file
-3. Verify JSON output is valid
-4. Review Markdown summary for obvious issues
+2. Navigate to extractor directory
+3. Run extractor against target save file
+4. Verify JSON output is valid
+5. Review Markdown summary for obvious issues
 
-**Command:**
+**Commands:**
 ```powershell
-python tools/extractor/rimworld_extractor.py "<save_file>.rws" -o state/snapshots/
+cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
+python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
 ```
 
 **Expected Outcome:** JSON and MD files in `state/snapshots/` with current timestamp  
-**Common Issues:** Large files may take 20-30 seconds; watch for memory warnings
+**Expected Output:** ~11 colonists, ~20 factions, ~65 resource types, ~310 research projects
 
 ---
 
@@ -39,6 +41,81 @@ python tools/extractor/rimworld_extractor.py "<save_file>.rws" -o state/snapshot
 
 ---
 
+## Development Workflows
+
+### Adding a New Parser Module
+
+**When to use:** When extraction needs to handle a new data section  
+**Location:** `tools/extractor/parsers/`
+
+**Steps:**
+1. Create new parser file: `parsers/{section}.py`
+2. Implement extraction function following lxml iterparse patterns
+3. Add import in `parsers/__init__.py`
+4. Integrate in `rimworld_extractor.py`
+5. Test against sample save
+6. Update memory bank if deliverables change
+
+**Pattern to follow:**
+```python
+from lxml import etree
+
+def extract_{section}(save_file_path: str) -> dict:
+    for event, elem in etree.iterparse(save_file_path, events=('end',)):
+        if elem.tag == 'target_tag':
+            # Extract data before clearing
+            data = elem.findtext('child')
+            elem.clear()
+            break
+    return data
+```
+
+---
+
+### Testing Extraction Changes
+
+**When to use:** After modifying extractor code
+
+**Steps:**
+1. Navigate to extractor directory
+2. Run extraction against test save
+3. Validate JSON is parseable
+4. Spot-check values against in-game data
+5. Check for new warnings/errors in output
+
+**Commands:**
+```powershell
+cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
+
+# Run extraction
+python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+
+# Validate JSON
+python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json')); print(f'Colonists: {len(d[\"colonists\"])}')"
+```
+
+---
+
+### Committing Feature Work
+
+**When to use:** After completing a feature or milestone
+
+**Steps:**
+1. Update worklog README in `work-logs/{milestone}/`
+2. Update memory bank files (context.md at minimum)
+3. Update main README if capabilities changed
+4. Stage and commit with conventional commit message
+
+**Commands:**
+```powershell
+cd D:\development-repositories\rimworld-ai-colony-coplay
+git add .
+git status  # Review changes
+git commit -m "feat(extractor): add faction relations with LoadID resolution"
+```
+
+---
+
 ## Memory Bank Maintenance
 
 ### Updating context.md
@@ -52,8 +129,6 @@ python tools/extractor/rimworld_extractor.py "<save_file>.rws" -o state/snapshot
 5. Add/resolve blockers as appropriate
 6. Update "Last Updated" date
 
-**Quality check:** Does context.md accurately reflect current state?
-
 ---
 
 ### Updating architecture.md
@@ -63,9 +138,7 @@ python tools/extractor/rimworld_extractor.py "<save_file>.rws" -o state/snapshot
 1. Add new components as they're created
 2. Document architectural decisions with rationale
 3. Update structure diagram if directories change
-4. Record integration points as they're established
-
-**Quality check:** Can someone understand the system structure from this file alone?
+4. Update extraction capabilities table
 
 ---
 
@@ -73,66 +146,41 @@ python tools/extractor/rimworld_extractor.py "<save_file>.rws" -o state/snapshot
 
 ### Session Start Procedure
 
-**Objective:** Load context and confirm understanding
-
-1. **Load memory bank files** — Read brief.md, context.md, scan others as needed
+1. **Load memory bank files** — Read brief.md, context.md
 2. **Confirm context** — Verify current phase and immediate next steps
 3. **Check for stale data** — If "Last Updated" is old, flag for review
 4. **Ready state** — Proceed with work
 
----
-
 ### Session End Procedure
 
-**Objective:** Update memory bank with session outcomes
-
 1. **Update context.md** — Accomplishments, next steps, decisions
-2. **Update other files if needed** — architecture.md, tech.md if changed
-3. **Commit changes** if appropriate
-
-```powershell
-git add .kilocode/rules/memory-bank/
-git commit -m "Update memory bank: [what changed]"
-```
+2. **Update other files if needed** — architecture.md, tech.md
+3. **Update worklog** if milestone work completed
+4. **Commit changes** if appropriate
 
 ---
 
-## Development Workflows
+## Future Workflows (Planned)
 
-### Adding a New Parser Module
+### Database Population
 
-**When to use:** When extraction needs to handle a new data section  
-**Location:** `tools/extractor/parsers/`
-
-**Steps:**
-1. Create new parser file: `parsers/{section}_parser.py`
-2. Implement extraction function following existing patterns
-3. Add import and integration in main extractor
-4. Test against sample save
-5. Update handoff doc if deliverables change
-
-**Expected Outcome:** New data section appears in JSON output
-
----
-
-### Testing Extraction Changes
-
-**When to use:** After modifying extractor code
+**When to use:** After PostgreSQL schema is created on pgsql01
 
 **Steps:**
-1. Run extraction against test save
-2. Validate JSON is parseable
-3. Spot-check values against in-game data
-4. Check for new warnings/errors in output
+1. Run extraction to JSON
+2. Load JSON into PostgreSQL tables
+3. Verify data integrity
+4. Query via CrystalDB MCP
 
-**Commands:**
-```powershell
-# Run extraction
-python tools/extractor/rimworld_extractor.py ".ai-sandbox/Deserters of the Rim#§#Hoeaia.rws" -o state/snapshots/
+### Watcher Daemon
 
-# Validate JSON
-python -c "import json; d=json.load(open('state/snapshots/latest.json')); print(f'Colonists: {len(d.get(\"colonists\", []))}')"
-```
+**When to use:** During active play sessions for automatic extraction
+
+**Steps:**
+1. Start watcher daemon pointing at saves directory
+2. Play RimWorld normally
+3. Watcher auto-extracts on autosave
+4. Data available in PostgreSQL for queries
 
 ---
 
@@ -140,13 +188,16 @@ python -c "import json; d=json.load(open('state/snapshots/latest.json')); print(
 
 ### Extraction Output Checklist
 - [ ] JSON is valid (parseable)
-- [ ] Colonist count matches in-game
+- [ ] Colonist count matches expected (~11 for Hoeaia)
+- [ ] Factions have relations populated (not empty arrays)
 - [ ] Resource counts are reasonable
 - [ ] No Python exceptions during run
 - [ ] Markdown summary is readable
 
 ### Code Change Checklist
-- [ ] Follows existing patterns
+- [ ] Follows lxml iterparse patterns
 - [ ] Handles missing/malformed data gracefully
+- [ ] Uses section guards (in_things, in_maps) for pawns
+- [ ] Extracts children before calling elem.clear()
 - [ ] Tested against sample save
 - [ ] No new warnings in extraction run

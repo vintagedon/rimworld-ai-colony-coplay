@@ -1,61 +1,67 @@
 # RimWorld AI Colony Co-Play Context
 
 ## Current State
-**Last Updated:** 2026-01-17
+**Last Updated:** 2026-01-18
 
 ### Recent Accomplishments
-- Repository scaffolded with standard template structure
-- Directory structure finalized (tools/, state/, mod/, game-saves/)
-- Memory bank populated with all 7 context files
-- Primary README and all interior READMEs written
-- Handoff document created for KC extractor work (`docs/rimworld-extractor-handoff.md`)
-- Colony saves organized in `game-saves/deserters-of-the-rim/` with event-triggered saves enabled
-- Reference materials added (RimAI Framework/Core source in `.reference-data/`)
-- M01 worklog completed
+- ✅ **M01: Ideation and Setup** — Complete
+- ✅ **M02: Extractor Phase 1** — Complete
+  - lxml streaming architecture implemented
+  - Meta extraction: 267 mods, game version
+  - Faction extraction: 20 factions with LoadID resolution
+  - Relations extraction: Goodwill values populated
+  - Colonist extraction: 11 colonists with skills, traits, needs
+  - Resource extraction: 65 item types categorized
+  - Research extraction: 310 completed projects
+  - Animal extraction: 34 animals
+  - Game time: Year, day, quadrum, season
+  - World info: Colony name, seed
 
 ### Current Phase
 
-**M01: Ideation and Setup** is complete. Ready for initial commit and M02.
+**M02: Extractor Phase 1** is complete. Ready for commit and M03 planning.
 
 ### Active Work
 
-Completed:
-1. ✓ Memory bank population
-2. ✓ Primary README.md
-3. ✓ Interior READMEs for all directories
-4. ✓ M01 worklog documentation
+Phase 1 Extraction — Complete:
+1. ✓ GDR research on RimWorld 1.6 XML structure
+2. ✓ lxml streaming parser implementation
+3. ✓ Faction relations with LoadID resolution
+4. ✓ Colonist/animal extraction with section guards
+5. ✓ Resource/research extraction
+6. ✓ JSON + Markdown output formats
+7. ✓ M02 worklog documentation
 
 ## Next Steps
 
 ### Immediate
-1. Initial commit: "Initial commit: repository scaffolding and documentation"
-2. Delete empty `README-pending.md` file
-3. Push to GitHub
+1. Update main README.md with Phase 1 completion
+2. Commit feature branch: `feature/extractor-phase1-foundation`
+3. Merge to main
 
 ### Near-Term (Next Sessions)
-- M02: GitHub Project Frameout (labels, milestones, tasks, sub-tasks)
-- Run KC extractor prompt to build initial Python script
-- Test extraction against Deserters of the Rim saves
-- Iterate on extraction completeness
+- **M03: Database Schema** — Design PostgreSQL tables for pgsql01
+- **M04: Watcher Daemon** — Auto-extract on new saves
+- **M05: MCP Integration** — CrystalDB MCP for Claude queries
 
 ### Future / Backlog
-- File watcher for automatic extraction on autosave
-- Historical diff tracking between snapshots
-- Un-gitignore `game-saves/` once tooling is stable
-- Phase 2 scoping: export mod architecture
-- Integration patterns for Claude advisory sessions
+- Storyteller/difficulty extraction (nested deeper in save)
+- Gender extraction for modded saves (stored in genes)
+- InfluxDB time series for trend analysis
+- Neo4j for relationship graphs
+- Progress Renderer correlation (visual + data)
 
 ## Active Decisions
 
 ### Pending Decisions
-- **Extraction trigger:** Manual CLI vs. file watcher daemon — deferred until basic extraction works
-- **History granularity:** How many snapshots to retain, diff format — decide after initial extraction validates
+- **Database schema:** Exact table structure for snapshots, colonists, skills, resources
+- **Watcher trigger:** Polling interval vs. filesystem events
 
 ### Recent Decisions
-- **2026-01-17 - Save location:** `game-saves/` replaces `.ai-sandbox/` as canonical save location
-- **2026-01-17 - Directory structure:** Chose `tools/` over `src/` for Python tooling, `state/` for extracted output, `mod/` as future placeholder
-- **2026-01-17 - State location:** Extracted JSON lives in repo (gitignored) rather than external location
-- **2026-01-17 - Colony focus:** Deserters of the Rim is active test colony
+- **2026-01-18 — lxml over stdlib:** Memory-efficient streaming for 22MB files
+- **2026-01-18 — Two-pass LoadID:** Build faction index, then resolve references
+- **2026-01-18 — Section guards:** Only extract pawns from `<things>` inside `<maps>`
+- **2026-01-18 — Database target:** pgsql01 with pgvector, not local Docker
 
 ## Blockers and Dependencies
 
@@ -63,17 +69,33 @@ Completed:
 - None
 
 ### External Dependencies
-- **RimWorld autosaves:** User has configured extended autosave (18 slots) with event-triggered saves
-- **FS MCP access:** Claude needs filesystem access to saves and extracted state
+- **pgsql01 (10.25.20.8):** PostgreSQL with pgvector for CAG system
+- **CrystalDB MCP:** For Claude to query extracted data
+- **RimWorld autosaves:** 18-slot autosave with event-triggered saves configured
 
-## Notes and Observations
+## Technical Notes
 
-### Recent Insights
-- RimAI mod source in `.reference-data/` provides useful reference for what's queryable (WorldDataService, Tooling patterns)
-- Save files are 11-29MB depending on colony age/size — streaming/targeted extraction preferred over full DOM load
-- Event-triggered saves (BadEvent/GoodEvent) provide excellent snapshots at critical game moments
+### Extraction Performance
+- 22MB save file processed in ~2 seconds
+- lxml iterparse keeps memory constant
+- 267 mods handled without issues
 
-### Context for Next Session
-- Handoff doc at `docs/rimworld-extractor-handoff.md` is ready for KC execution
-- Test saves are in `game-saves/deserters-of-the-rim/` — use `Hoeaia.rws` as primary test file
-- Extractor script location: `tools/extractor/rimworld_extractor.py` (to be created)
+### Known XML Quirks (RimWorld 1.6)
+- Pawns use `<thing Class="Pawn">` not `<li Class="Pawn">`
+- Faction references use `Faction_N` format
+- Skills nested under `<skills><skills><li>`
+- Gender stored in genes/body type for modded pawns
+- Compressed world data in `*Deflate` tags (ignored)
+
+### File Locations
+- Extractor: `tools/extractor/rimworld_extractor.py`
+- Parsers: `tools/extractor/parsers/`
+- Test save: `game-saves/deserters-of-the-rim/Deserters of the Rim#§#Hoeaia.rws`
+- Output: `state/snapshots/colony_*.json` and `colony_*.md`
+- GDR report: `.internal-files/rimworld-1_6-save-file-xml.md`
+
+## Context for Next Session
+- Extractor is functional — run from `tools/extractor/`
+- Output validates against actual colony (11 colonists, 310 research, etc.)
+- Ready to design database schema for historical storage
+- CAG architecture: Save → Extractor → PostgreSQL → MCP → Claude
