@@ -17,11 +17,37 @@
 **Commands:**
 ```powershell
 cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
-python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
 ```
 
 **Expected Outcome:** JSON and MD files in `state/snapshots/` with current timestamp  
-**Expected Output:** ~11 colonists, ~20 factions, ~65 resource types, ~310 research projects
+**Expected Output:** ~7 colonists, ~20 factions, ~1000 buildings, ~45 research projects
+
+---
+
+### Schema Discovery: Analyzing Save Structure
+
+**When to use:** When extraction returns unexpected results or after RimWorld updates  
+**Frequency:** As needed for debugging or path verification
+
+**Steps:**
+1. Run schema discovery against a save file
+2. Review output for path structure
+3. Compare against extractor assumptions
+4. Update extractor paths if needed
+
+**Commands:**
+```powershell
+cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
+
+# Full depth discovery (large output)
+python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws"
+
+# Limited depth for overview
+python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -d 6
+```
+
+**Expected Outcome:** Markdown file with full XML tree structure, depths, sample values
 
 ---
 
@@ -43,35 +69,6 @@ python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of
 
 ## Development Workflows
 
-### Adding a New Parser Module
-
-**When to use:** When extraction needs to handle a new data section  
-**Location:** `tools/extractor/parsers/`
-
-**Steps:**
-1. Create new parser file: `parsers/{section}.py`
-2. Implement extraction function following lxml iterparse patterns
-3. Add import in `parsers/__init__.py`
-4. Integrate in `rimworld_extractor.py`
-5. Test against sample save
-6. Update memory bank if deliverables change
-
-**Pattern to follow:**
-```python
-from lxml import etree
-
-def extract_{section}(save_file_path: str) -> dict:
-    for event, elem in etree.iterparse(save_file_path, events=('end',)):
-        if elem.tag == 'target_tag':
-            # Extract data before clearing
-            data = elem.findtext('child')
-            elem.clear()
-            break
-    return data
-```
-
----
-
 ### Testing Extraction Changes
 
 **When to use:** After modifying extractor code
@@ -88,10 +85,51 @@ def extract_{section}(save_file_path: str) -> dict:
 cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
 
 # Run extraction
-python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
 
 # Validate JSON
-python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json')); print(f'Colonists: {len(d[\"colonists\"])}')"
+python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json')); print(f'Colonists: {len(d[\"colonists\"])}, Buildings: {d[\"buildings\"][\"total_count\"]}')"
+
+# JSON only (faster for testing)
+python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" --json-only
+```
+
+---
+
+### Adding New Extraction Category
+
+**When to use:** When a new data section needs to be extracted  
+**Location:** `tools/extractor/rimworld_extractor_v2.py`
+
+**Steps:**
+1. Run schema_discovery.py to find the XML path
+2. Add extraction function following existing patterns
+3. Wire into `extract_all()` method
+4. Add to markdown report in `generate_markdown()`
+5. Test against sample save
+6. Add dual-audience comments
+7. Update memory bank if deliverables change
+
+**Pattern to follow:**
+```python
+def extract_{section}(root: etree._Element) -> dict:
+    """Extract {section} data from {path}.
+    
+    {Context for humans about what this data represents.}
+    
+    AI NOTE: {Any hidden constraints or cross-references to watch for.}
+    """
+    data = {}
+    
+    section_elem = root.find('game/path/to/section')
+    if section_elem is None:
+        return data
+    
+    for item in section_elem.findall('items/li'):
+        # Extract with safe getters
+        data[get_text(item.find('key'))] = get_text(item.find('value'))
+    
+    return data
 ```
 
 ---
@@ -111,7 +149,7 @@ python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json'))
 cd D:\development-repositories\rimworld-ai-colony-coplay
 git add .
 git status  # Review changes
-git commit -m "feat(extractor): add faction relations with LoadID resolution"
+git commit -m "feat(extractor): add quest extraction with status derivation"
 ```
 
 ---
@@ -188,16 +226,24 @@ git commit -m "feat(extractor): add faction relations with LoadID resolution"
 
 ### Extraction Output Checklist
 - [ ] JSON is valid (parseable)
-- [ ] Colonist count matches expected (~11 for Hoeaia)
+- [ ] Colonist count matches expected (~7 for The Fringe Benefit)
 - [ ] Factions have relations populated (not empty arrays)
+- [ ] Buildings total is reasonable (~1000)
 - [ ] Resource counts are reasonable
 - [ ] No Python exceptions during run
 - [ ] Markdown summary is readable
 
 ### Code Change Checklist
-- [ ] Follows lxml iterparse patterns
+- [ ] Uses safe getters (get_text, get_int, get_float)
 - [ ] Handles missing/malformed data gracefully
-- [ ] Uses section guards (in_things, in_maps) for pawns
-- [ ] Extracts children before calling elem.clear()
+- [ ] Checks for IsNull="True" attributes before iterating
+- [ ] Player faction detection uses correct prefix handling
 - [ ] Tested against sample save
 - [ ] No new warnings in extraction run
+- [ ] Dual-audience comments added where appropriate
+
+### Dual-Audience Comment Checklist
+- [ ] Intent comments explain what/why, not what the code says
+- [ ] AI NOTEs added for hidden constraints (cross-references, required formats)
+- [ ] No commenting theatre (obvious code left uncommented)
+- [ ] Docstrings on all extraction functions

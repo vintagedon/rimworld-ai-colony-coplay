@@ -3,8 +3,8 @@
 title: "Game Saves"
 description: "RimWorld save file archive for AI-assisted colony tracking"
 author: "VintageDon"
-date: "2026-01-17"
-version: "1.0"
+date: "2026-01-18"
+version: "1.1"
 status: "Active"
 tags:
   - type: directory-readme
@@ -16,7 +16,7 @@ tags:
 
 RimWorld save file archive. Contains complete colony history for AI advisory sessions.
 
-**Status:** Currently gitignored. Will be exposed publicly once extraction pipeline is stable.
+**Status:** Public — save files are tracked for open methodology demonstration.
 
 ---
 
@@ -24,11 +24,11 @@ RimWorld save file archive. Contains complete colony history for AI advisory ses
 
 ```
 game-saves/
-├── {colony-name}/              # One folder per colony
-│   ├── *#§#Autosave-*.rws      # Rolling autosaves
-│   ├── *#§#BadEvent.*.rws      # Event-triggered (negative)
-│   ├── *#§#GoodEvent.*.rws     # Event-triggered (positive)
-│   └── *#§#*.rws               # Manual saves
+├── the-fringe-benefit/         # Current test colony
+│   ├── *#§#Autosave-*.rws      # Rolling autosaves (18 slots)
+│   ├── BadEvent/               # Event-triggered saves (negative)
+│   ├── GoodEvent/              # Event-triggered saves (positive)
+│   └── README.md
 └── README.md                   # This file
 ```
 
@@ -36,9 +36,9 @@ game-saves/
 
 ## 2. Current Colonies
 
-| Colony | Description |
-|--------|-------------|
-| [deserters-of-the-rim/](deserters-of-the-rim/) | Primary test colony, 300+ mods |
+| Colony | Description | Status |
+|--------|-------------|--------|
+| [the-fringe-benefit/](the-fringe-benefit/README.md) | Primary test colony, 270 mods | ✅ Active |
 
 ---
 
@@ -55,7 +55,7 @@ RimWorld (with mods) generates saves with this pattern:
 | Autosave-N | Timed interval | `Autosave-1.rws` through `Autosave-18.rws` |
 | BadEvent | Negative event | `BadEvent.Raid- Blue Moon Corporation.rws` |
 | GoodEvent | Positive event | `GoodEvent.Cargo pods (apparel).rws` |
-| Manual | Player-initiated | `Hoeaia.rws`, `New Arrivals1.rws` |
+| Manual | Player-initiated | `Colony Name.rws` |
 
 ---
 
@@ -77,10 +77,10 @@ Recommended settings for maximum history:
 
 ```powershell
 # Extract latest autosave
-python tools/extractor/rimworld_extractor.py "game-saves/deserters-of-the-rim/Deserters of the Rim#§#Autosave-1.rws"
+python tools/extractor/rimworld_extractor_v2.py "game-saves/the-fringe-benefit/the-fringe-benefit#§#Autosave-129.rws" -o state/snapshots/the-fringe-benefit/
 
-# Extract specific event
-python tools/extractor/rimworld_extractor.py "game-saves/deserters-of-the-rim/Deserters of the Rim#§#BadEvent.Raid- Blue Moon Corporation.rws"
+# Extract specific event save
+python tools/extractor/rimworld_extractor_v2.py "game-saves/the-fringe-benefit/BadEvent/the-fringe-benefit#§#BadEvent.Raid.rws"
 ```
 
 ### For Claude Advisory
@@ -89,16 +89,7 @@ Claude reads extracted state from `state/snapshots/`, not directly from save fil
 
 ---
 
-## 6. Gitignore Status
-
-Currently ignored to avoid committing large binary files during development. Will be tracked once:
-- Extraction pipeline is stable
-- Save file sizes are validated acceptable
-- Public exposure aligns with open methodology goals
-
----
-
-## 7. Related
+## 6. Related
 
 | Document | Relationship |
 |----------|--------------|

@@ -4,15 +4,15 @@
 
 ### Primary Technologies
 - **Python 3.10+** — Save file extraction and tooling
-- **lxml** — Streaming XML parsing via iterparse for memory efficiency
+- **lxml** — DOM-based XML parsing for schema discovery and extraction
 - **JSON** — Output format for extracted state
 - **Markdown** — Human-readable state summaries
 
 ### Data Infrastructure (Planned)
-- **PostgreSQL 16** — Primary data storage on pgsql01 (10.25.20.8)
+- **PostgreSQL 16** — Primary data storage on pgsql01
 - **pgvector** — Semantic search over colony history
-- **InfluxDB** — Time series for trend analysis (optional)
-- **Neo4j** — Relationship graphs (optional)
+- **TimescaleDB** — Time series extension for trend analysis (mood, resources over time)
+- **Neo4j** — Relationship graphs (colonist social networks, faction webs)
 
 ### Future Technologies (Phase 2+)
 - **C# / Unity** — RimWorld mod development
@@ -22,7 +22,7 @@
 
 ### Required Dependencies
 ```
-lxml>=5.0.0  # Streaming XML parsing
+lxml>=5.0.0  # DOM-based XML parsing
 ```
 
 ### Development Dependencies
@@ -35,6 +35,7 @@ lxml>=5.0.0  # Streaming XML parsing
 ```
 psycopg2>=2.9.0   # PostgreSQL connection
 watchdog>=3.0.0   # File system monitoring
+neo4j>=5.0.0      # Neo4j driver
 ```
 
 ## Development Environment
@@ -59,7 +60,7 @@ pip install lxml
 
 # Run extractor
 cd tools/extractor
-python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
 ```
 
 ### Environment Variables / Configuration
@@ -80,21 +81,22 @@ python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of
 - **Output:** JSON/Markdown files in `state/snapshots/`
 
 ### Planned (Phase 1b+)
-- **Database:** pgsql01 (10.25.20.8) — PostgreSQL with pgvector
+- **Database:** pgsql01 — PostgreSQL with pgvector + TimescaleDB extension
+- **Graph DB:** Neo4j for relationship queries
 - **MCP:** CrystalDB MCP for Claude queries
 - **Watcher:** File system daemon for auto-extraction
 
 ## Technical Constraints
 
 ### Performance Requirements
-- Process 25MB save file in <30 seconds ✅ (actual: ~2 seconds)
+- Process 25MB save file in <30 seconds ✅ (actual: ~3 seconds)
 - Memory usage should not exceed 500MB during extraction ✅
 - Graceful handling of malformed/unexpected XML ✅
 
 ### Compatibility Requirements
 - Windows 10/11 (primary target)
 - RimWorld 1.6+ save format (Odyssey expansion)
-- Handles 267+ mod configurations
+- Handles 270+ mod configurations
 
 ### File Format Constraints
 - Input: .rws files (XML with CRLF line endings)
@@ -104,18 +106,21 @@ python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of
 
 ### Version Control
 - **Repository:** GitHub
-- **Branching Strategy:** Feature branches (`feature/extractor-phase1-foundation`)
+- **Branching Strategy:** Feature branches
 - **Commit Conventions:** Conventional commits (feat:, fix:, docs:, etc.)
 
 ### Testing
 
 ```powershell
-# Run extraction against test save
+# Run schema discovery (to understand save structure)
 cd tools/extractor
-python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws"
+
+# Run extraction against test save
+python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
 
 # Check output
-Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 50
+Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 100
 ```
 
 ### Build and Deployment
@@ -123,20 +128,21 @@ Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 50
 ```powershell
 # No build step for Python
 # Run extraction from tools/extractor/
-python rimworld_extractor.py <save_file> [-o output_dir]
+python rimworld_extractor_v2.py <save_file> [-o output_dir] [--json-only] [--md-only]
 ```
 
 ## File Locations
 
 ### Scripts
-- `tools/extractor/rimworld_extractor.py` — Main extraction script
-- `tools/extractor/parsers/meta.py` — Game/world info extraction
-- `tools/extractor/parsers/factions.py` — Faction/relations extraction
+- `tools/extractor/rimworld_extractor_v2.py` — Main extraction script (v2.2, schema-driven)
+- `tools/extractor/schema_discovery.py` — XML structure analysis tool
+- `tools/extractor/rimworld_extractor.py` — Legacy v1 extractor (reference only)
+- `tools/extractor/parsers/` — Legacy modular parsers (reference only)
 
 ### Data
-- `game-saves/deserters-of-the-rim/` — Colony save files
+- `game-saves/the-fringe-benefit/` — Current colony save files
 - `state/snapshots/` — Extracted JSON/Markdown output
-- `.internal-files/` — Development artifacts, GDR report
+- `.internal-files/` — Development artifacts, schema outputs
 
 ### Documentation
 - `.kilocode/rules/memory-bank/` — Agent context files
@@ -151,29 +157,72 @@ python rimworld_extractor.py <save_file> [-o output_dir]
 **Problem:** `ModuleNotFoundError: No module named 'lxml'`  
 **Solution:** `pip install lxml`
 
-#### Wrong element cleared
-**Problem:** Data returns None/empty despite existing in XML  
-**Solution:** Extract children before calling `elem.clear()` on parent
+#### "Unknown" values in output
+**Problem:** Faction names, genders, or other fields show as "Unknown"  
+**Solution:** Run schema_discovery.py to verify XML paths, update extractor if paths changed
 
-#### Wrong pawns extracted
-**Problem:** World pawns captured instead of colonists  
-**Solution:** Add `in_things`/`in_maps` section guards
+#### Zero colonists extracted
+**Problem:** Colonist array is empty despite having colonists in-game  
+**Solution:** Player faction detection may have failed — check that `def="PlayerColony"` faction exists and ID prefix handling is correct
+
+#### Work Tab shows Thing_HumanXXXXX
+**Problem:** Work Tab priorities use pawn references, not names  
+**Solution:** Known limitation — cross-reference resolution planned for future version
 
 ### Debug Commands
 
 ```powershell
 # Check save file size
-(Get-Item "game-saves\deserters-of-the-rim\*.rws").Length / 1MB
+(Get-Item "game-saves\the-fringe-benefit\*.rws").Length / 1MB
 
-# View extraction output
-Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty colonists
+# View extraction output summary
+Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty colonists | Select-Object -ExpandProperty name
 
 # Check faction relations
 Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty factions | Where-Object is_player
+
+# Run schema discovery for debugging
+python tools\extractor\schema_discovery.py "game-saves\the-fringe-benefit\*.rws" -d 8
 ```
 
 ## Technical Documentation
 
-- **GDR Report:** `.internal-files/rimworld-1_6-save-file-xml.md` — RimWorld 1.6 XML structure
-- **Handoff Doc:** `.internal-files/rimworld-extractor-handoff.md` — Original spec (partially outdated)
-- **lxml Docs:** https://lxml.de/parsing.html#iterparse-and-iterwalk
+- **Schema Discovery Output:** `.internal-files/schema_*.md` — Actual XML structure from saves
+- **lxml Docs:** https://lxml.de/parsing.html
+- **RimWorld Wiki:** Save file format documentation (1.2-era, mostly still valid)
+
+## Extractor CLI Reference
+
+```
+usage: rimworld_extractor_v2.py [-h] [-o OUTPUT] [--json-only] [--md-only] save_file
+
+Extract data from RimWorld save files (v2.2 - schema-driven)
+
+positional arguments:
+  save_file             Path to .rws save file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output directory (default: same as save file)
+  --json-only           Only output JSON, skip markdown
+  --md-only             Only output markdown, skip JSON
+```
+
+## Schema Discovery CLI Reference
+
+```
+usage: schema_discovery.py [-h] [-o OUTPUT] [-d DEPTH] save_file
+
+Discover XML schema structure from RimWorld save files
+
+positional arguments:
+  save_file             Path to .rws save file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output file (default: schema_{save_name}.md)
+  -d DEPTH, --depth DEPTH
+                        Maximum depth to traverse (default: unlimited)
+```
