@@ -1,6 +1,6 @@
 <!--
 ---
-title: "M03: Extractor Phase 2 — Schema-Driven v2"
+title: "M02b: Extractor Phase 2 — Schema-Driven v2"
 description: "Schema discovery, DOM parsing, full extraction suite"
 author: "VintageDon"
 date: "2026-01-18"

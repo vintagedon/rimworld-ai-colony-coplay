@@ -27,10 +27,9 @@ import argparse
 import json
 import re
 import sys
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from lxml import etree
 
@@ -510,8 +509,6 @@ def extract_work_tab_priorities(root: etree._Element) -> dict:
 
         work_data['has_work_tab_mod'] = True
 
-        pawn_keys = [get_text(li) for li in priorities_elem.findall('keys/li')]
-
         for idx, pawn_li in enumerate(priorities_elem.findall('values/li')):
             pawn_ref = get_text(pawn_li.find('Pawn'))
             load_id = get_text(pawn_li.find('loadId'))
@@ -537,6 +534,8 @@ def extract_work_tab_priorities(root: etree._Element) -> dict:
                         try:
                             pawn_priorities['priorities'][workgiver] = int(priority_val)
                         except ValueError:
+                            # Malformed priority value (non-integer); skip this workgiver
+                            # to allow extraction to continue robustly
                             pass
 
                     if workgiver not in work_data['workgiver_list']:
