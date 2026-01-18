@@ -1,12 +1,35 @@
+<!--
+---
+title: "Shared Utilities"
+description: "Cross-project utilities and scripts"
+author: "VintageDon"
+date: "2026-01-18"
+version: "1.0"
+status: "Active"
+tags:
+  - type: directory-readme
+  - domain: utilities
+  - tech: python
+---
+-->
+
 # Shared
 
 Cross-project utilities and scripts used consistently across repositories.
 
 ---
 
-## Contents
+## 1. Contents
 
-### Files
+```
+shared/
+├── generate_tree.py    # Directory tree generator for documentation
+└── README.md           # This file
+```
+
+---
+
+## 2. Tools
 
 | File | Purpose |
 |------|---------|
@@ -14,37 +37,20 @@ Cross-project utilities and scripts used consistently across repositories.
 
 ---
 
-## Structure
-
-```
-shared/
-├── generate_tree.py
-└── README.md
-```
-
----
-
-## Usage
-
-These scripts are designed to be copied or referenced across projects. They're collected here as a canonical source.
+## 3. Usage
 
 ```powershell
-# Example: Generate tree for current directory
+# Generate tree for current directory
 python shared/generate_tree.py .
+
+# Generate tree for specific path
+python shared/generate_tree.py D:\development-repositories\rimworld-ai-colony-coplay
 ```
 
 ---
 
-## Related
+## 4. Related
 
-| Directory | Relationship |
-|-----------|--------------|
-| [Repository Root](../README.md) | Parent |
-
----
-
-| Field | Value |
-|-------|-------|
-| Maintainer | [@vintagedon](https://github.com/vintagedon) |
-| Created | 2025-01-01 |
-| Last Updated | 2025-01-01 |
+| Document | Relationship |
+|----------|--------------|
+| [Repository Root](../README.md) | Parent directory |

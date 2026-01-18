@@ -3,8 +3,8 @@
 title: "State"
 description: "Extracted game state snapshots and historical data"
 author: "VintageDon"
-date: "2026-01-17"
-version: "1.0"
+date: "2026-01-18"
+version: "1.1"
 status: "Active"
 tags:
   - type: directory-readme
@@ -14,7 +14,7 @@ tags:
 
 # State
 
-Extracted RimWorld game state. This directory contains output from the extractor and is **gitignored** (regenerated from saves).
+Extracted RimWorld game state. This directory contains output from the extractor.
 
 ---
 
@@ -22,14 +22,15 @@ Extracted RimWorld game state. This directory contains output from the extractor
 
 ```
 state/
-├── snapshots/          # Point-in-time extractions
-│   ├── {timestamp}.json
-│   ├── {timestamp}.md
-│   └── latest.json     # Symlink/copy of most recent
-├── history/            # Historical analysis (future)
-│   ├── diffs/          # Changes between snapshots
-│   └── trends/         # Aggregated trend data
-└── README.md           # This file
+├── snapshots/                          # Point-in-time extractions
+│   ├── the-fringe-benefit/             # Current test colony output
+│   │   ├── colony_{timestamp}.json
+│   │   └── colony_{timestamp}.md
+│   └── milestone-03-extractor-phase-02/ # Milestone captures
+├── history/                            # Historical analysis (planned)
+│   ├── diffs/                          # Changes between snapshots
+│   └── trends/                         # Aggregated trend data
+└── README.md                           # This file
 ```
 
 ---
@@ -38,8 +39,8 @@ state/
 
 | Directory | Description | Status |
 |-----------|-------------|--------|
-| [snapshots/](snapshots/) | Point-in-time JSON/MD extractions | 🔄 Active |
-| [history/](history/) | Diffs and trend analysis | ⬜ Planned |
+| [snapshots/](snapshots/README.md) | Point-in-time JSON/MD extractions | ✅ Active |
+| [history/](history/README.md) | Diffs and trend analysis | ⬜ Planned |
 
 ---
 
@@ -51,18 +52,18 @@ Claude reads from this directory via FS MCP during conversations:
 
 ```
 "How is Viktor doing?"
-→ Claude reads state/snapshots/latest.json
+→ Claude reads state/snapshots/the-fringe-benefit/colony_*.json
 → Returns mood, health, recent events for Viktor
 ```
 
 ### Manual Inspection
 
 ```powershell
-# View latest extraction metadata
-cat state/snapshots/latest.json | jq '.metadata'
+# View latest extraction summary
+Get-Content state/snapshots/the-fringe-benefit/colony_*.md | Select-Object -First 100
 
-# View colonist summary
-cat state/snapshots/latest.md
+# Parse JSON for specific data
+Get-Content state/snapshots/the-fringe-benefit/colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty colonists
 ```
 
 ---
@@ -72,28 +73,24 @@ cat state/snapshots/latest.md
 ### Snapshots
 
 ```
-{colony_name}_{timestamp}.json
-{colony_name}_{timestamp}.md
+colony_{timestamp}.json
+colony_{timestamp}.md
 
 Example:
-deserters-of-the-rim_2026-01-17T15-30-00.json
-deserters-of-the-rim_2026-01-17T15-30-00.md
+colony_20260118_153000.json
+colony_20260118_153000.md
 ```
-
-### Latest
-
-`latest.json` and `latest.md` are copies of the most recent extraction for easy access.
 
 ---
 
-## 5. Gitignore
+## 5. Gitignore Status
 
-This directory's contents are gitignored because:
+Snapshot contents are typically gitignored because:
 - Output is regenerated from save files
 - JSON files can be large (1-5MB per snapshot)
 - Personal game data shouldn't be in version control
 
-The directory structure and README are tracked; contents are not.
+The directory structure and READMEs are tracked; contents may not be.
 
 ---
 
@@ -103,4 +100,4 @@ The directory structure and README are tracked; contents are not.
 |----------|--------------|
 | [Repository Root](../README.md) | Parent directory |
 | [tools/extractor/](../tools/extractor/README.md) | Produces this output |
-| [game-saves/](../game-saves/) | Source save files |
+| [game-saves/](../game-saves/README.md) | Source save files |
