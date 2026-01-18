@@ -3,41 +3,45 @@
 ## Technology Stack
 
 ### Primary Technologies
-- **Python:** 3.10+ — Save file extraction and tooling
-- **XML (stdlib):** ElementTree or streaming — Parse RimWorld .rws files
-- **JSON:** Output format for extracted state
+- **Python 3.10+** — Save file extraction and tooling
+- **lxml** — Streaming XML parsing via iterparse for memory efficiency
+- **JSON** — Output format for extracted state
+- **Markdown** — Human-readable state summaries
 
-### Supporting Technologies
-- **Markdown:** Human-readable state summaries
-- **PowerShell:** Windows automation, file watching (future)
-- **C# (Phase 2):** RimWorld mod development
+### Data Infrastructure (Planned)
+- **PostgreSQL 16** — Primary data storage on pgsql01 (10.25.20.8)
+- **pgvector** — Semantic search over colony history
+- **InfluxDB** — Time series for trend analysis (optional)
+- **Neo4j** — Relationship graphs (optional)
 
 ### Future Technologies (Phase 2+)
-- **Unity/.NET:** RimWorld modding framework
-- **Harmony:** RimWorld mod patching library
+- **C# / Unity** — RimWorld mod development
+- **Harmony** — RimWorld mod patching library
 
 ## Dependencies
 
 ### Required Dependencies
 ```
-# Python stdlib only for Phase 1
-# No external packages required initially
-
-# Optional for enhanced functionality:
-# watchdog>=3.0.0  # File system monitoring (watcher)
+lxml>=5.0.0  # Streaming XML parsing
 ```
 
 ### Development Dependencies
 ```
 # None required for basic extraction
 # pytest>=7.0.0    # Testing (if added)
-# black>=23.0.0    # Formatting (if added)
+```
+
+### Future Dependencies
+```
+psycopg2>=2.9.0   # PostgreSQL connection
+watchdog>=3.0.0   # File system monitoring
 ```
 
 ## Development Environment
 
 ### Prerequisites
 - Python 3.10 or higher
+- lxml installed (`pip install lxml`)
 - Access to RimWorld saves directory
 - FS MCP configured for Claude Desktop
 
@@ -50,21 +54,19 @@ cd D:\development-repositories\rimworld-ai-colony-coplay
 # Verify Python version
 python --version  # Should be 3.10+
 
-# No virtual environment needed for stdlib-only Phase 1
-# If dependencies added later:
-# python -m venv .venv
-# .venv\Scripts\activate
-# pip install -r requirements.txt
+# Install dependencies
+pip install lxml
 
-# Verify saves access
-ls "$env:LOCALAPPDATA\..\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves"
+# Run extractor
+cd tools/extractor
+python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
 ```
 
 ### Environment Variables / Configuration
 
 ```powershell
-# No environment variables required
-# Paths configured via CLI arguments or config file (future)
+# No environment variables required for extraction
+# Database credentials will come from /opt/global-env/research.env on cluster
 
 # RimWorld saves location (default):
 # C:\Users\{user}\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\
@@ -72,26 +74,27 @@ ls "$env:LOCALAPPDATA\..\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Save
 
 ## Infrastructure
 
-### Hosting / Runtime Environment
+### Current (Phase 1)
 - **Platform:** Local Windows workstation
 - **Resources:** Minimal — Python script runs on-demand
-- **Access:** Local filesystem only
+- **Output:** JSON/Markdown files in `state/snapshots/`
 
-### External Services
-- **None required for Phase 1**
-- Future: May integrate with Claude API for automated advisory (not planned)
+### Planned (Phase 1b+)
+- **Database:** pgsql01 (10.25.20.8) — PostgreSQL with pgvector
+- **MCP:** CrystalDB MCP for Claude queries
+- **Watcher:** File system daemon for auto-extraction
 
 ## Technical Constraints
 
 ### Performance Requirements
-- Process 25MB save file in <30 seconds
-- Memory usage should not exceed 500MB during extraction
-- Graceful handling of malformed/unexpected XML
+- Process 25MB save file in <30 seconds ✅ (actual: ~2 seconds)
+- Memory usage should not exceed 500MB during extraction ✅
+- Graceful handling of malformed/unexpected XML ✅
 
 ### Compatibility Requirements
 - Windows 10/11 (primary target)
-- RimWorld 1.5+ save format
-- Handles 300+ mod configurations without crashing
+- RimWorld 1.6+ save format (Odyssey expansion)
+- Handles 267+ mod configurations
 
 ### File Format Constraints
 - Input: .rws files (XML with CRLF line endings)
@@ -100,76 +103,77 @@ ls "$env:LOCALAPPDATA\..\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Save
 ## Development Workflow
 
 ### Version Control
-- **Repository:** Local Git, GitHub remote
-- **Branching Strategy:** Feature branches for development work
+- **Repository:** GitHub
+- **Branching Strategy:** Feature branches (`feature/extractor-phase1-foundation`)
 - **Commit Conventions:** Conventional commits (feat:, fix:, docs:, etc.)
 
 ### Testing
 
 ```powershell
-# Manual testing against test saves
-python tools/extractor/rimworld_extractor.py ".ai-sandbox/Deserters of the Rim#§#Hoeaia.rws" -o state/snapshots/
+# Run extraction against test save
+cd tools/extractor
+python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
 
-# Validate JSON output
-python -c "import json; json.load(open('state/snapshots/latest.json'))"
+# Check output
+Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 50
 ```
 
 ### Build and Deployment
 
 ```powershell
 # No build step for Python
-# "Deployment" is just running the script
-
-# Run extraction
-python tools/extractor/rimworld_extractor.py <save_file> [-o output_dir]
+# Run extraction from tools/extractor/
+python rimworld_extractor.py <save_file> [-o output_dir]
 ```
 
-## Automation and Tooling
+## File Locations
 
-### Available Scripts
-- `tools/extractor/rimworld_extractor.py` — Main extraction script (to be created)
-- `shared/generate_tree.py` — Directory tree generation
+### Scripts
+- `tools/extractor/rimworld_extractor.py` — Main extraction script
+- `tools/extractor/parsers/meta.py` — Game/world info extraction
+- `tools/extractor/parsers/factions.py` — Faction/relations extraction
 
-### Future Automation
-- File watcher daemon for automatic extraction
-- Batch extraction for historical analysis
+### Data
+- `game-saves/deserters-of-the-rim/` — Colony save files
+- `state/snapshots/` — Extracted JSON/Markdown output
+- `.internal-files/` — Development artifacts, GDR report
 
-### Development Tools
-- **VS Code:** Primary editor (workspace settings in `.vscode/`)
-- **Claude Desktop:** Advisory interface, FS MCP access
-- **KiloCode:** AI coding assistant for development work
+### Documentation
+- `.kilocode/rules/memory-bank/` — Agent context files
+- `work-logs/` — Phase completion records
+- `docs/documentation-standards/` — Templates
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Large file memory errors
-**Problem:** Python runs out of memory parsing large saves  
-**Solution:** Use streaming XML parsing (iterparse) instead of full DOM load
+#### lxml not installed
+**Problem:** `ModuleNotFoundError: No module named 'lxml'`  
+**Solution:** `pip install lxml`
 
-#### Encoding errors
-**Problem:** Non-UTF8 characters in save file cause decode errors  
-**Solution:** Read with `encoding='utf-8-sig'` or handle errors='replace'
+#### Wrong element cleared
+**Problem:** Data returns None/empty despite existing in XML  
+**Solution:** Extract children before calling `elem.clear()` on parent
 
-#### Missing data sections
-**Problem:** Expected XML structure not found (mod variations)  
-**Solution:** Wrap section parsing in try/except, log warnings, continue
+#### Wrong pawns extracted
+**Problem:** World pawns captured instead of colonists  
+**Solution:** Add `in_things`/`in_maps` section guards
 
 ### Debug Commands
 
 ```powershell
 # Check save file size
-(Get-Item ".ai-sandbox\Deserters of the Rim#§#Hoeaia.rws").Length / 1MB
+(Get-Item "game-saves\deserters-of-the-rim\*.rws").Length / 1MB
 
-# Count lines in save
-(Get-Content ".ai-sandbox\Deserters of the Rim#§#Hoeaia.rws" | Measure-Object -Line).Lines
+# View extraction output
+Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty colonists
 
-# Quick XML structure peek
-Select-String -Path ".ai-sandbox\*.rws" -Pattern "<colonists>" | Select-Object -First 5
+# Check faction relations
+Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty factions | Where-Object is_player
 ```
 
 ## Technical Documentation
 
-- **RimWorld Save Format:** Observed structure documented in `docs/rimworld-extractor-handoff.md`
-- **RimAI Reference:** `.reference-data/Rimworld_AI_Core-main/docs/` for mod patterns
-- **Python XML:** https://docs.python.org/3/library/xml.etree.elementtree.html
+- **GDR Report:** `.internal-files/rimworld-1_6-save-file-xml.md` — RimWorld 1.6 XML structure
+- **Handoff Doc:** `.internal-files/rimworld-extractor-handoff.md` — Original spec (partially outdated)
+- **lxml Docs:** https://lxml.de/parsing.html#iterparse-and-iterwalk

@@ -3,25 +3,26 @@
 title: "RimWorld AI Colony Co-Play"
 description: "External AI advisor for RimWorld colony management via save file analysis"
 author: "VintageDon"
-date: "2026-01-17"
-version: "0.1.0"
+date: "2026-01-18"
+version: "0.2.0"
 status: "Development"
 tags:
   - type: project-root
   - domain: gaming
   - domain: ai-integration
   - tech: python
+  - tech: lxml
   - tech: xml-parsing
 related_documents:
-  - "[Extractor Handoff](docs/rimworld-extractor-handoff.md)"
-  - "[Memory Bank](/.kilocode/rules/memory-bank/README.md)"
+  - "[GDR Report](.internal-files/rimworld-1_6-save-file-xml.md)"
+  - "[Memory Bank](.kilocode/rules/memory-bank/README.md)"
 ---
 -->
 
 # 🎯 RimWorld AI Colony Co-Play
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![RimWorld](https://img.shields.io/badge/RimWorld-1.5-orange)](https://rimworldgame.com)
+[![RimWorld](https://img.shields.io/badge/RimWorld-1.6-orange)](https://rimworldgame.com)
 [![Claude](https://img.shields.io/badge/Claude-Desktop-blueviolet)](https://claude.ai)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -63,59 +64,74 @@ The result is an AI companion that knows your colonists by name, remembers that 
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1: Save Extraction | 🔄 In Progress | Python extractor parsing .rws files to JSON |
-| Phase 1: File Watcher | ⬜ Planned | Automatic extraction on autosave |
+| Phase 1a: Save Extraction | ✅ Complete | lxml streaming extractor producing JSON/Markdown |
+| Phase 1b: Database Storage | ⬜ Planned | PostgreSQL with pgvector on pgsql01 |
+| Phase 1c: MCP Integration | ⬜ Planned | CrystalDB MCP for Claude queries |
 | Phase 2: Export Mod | ⬜ Future | C# mod for real-time state export |
 | Phase 3: Interaction | ⬜ Future | Limited game interaction capabilities |
 
-### Current Milestone
+### Current Capabilities
 
-**M01: Ideation and Setup** — Repository scaffolding and documentation complete. Ready for M02 (GitHub project setup) and extractor development.
+The extractor successfully processes 22MB modded save files in ~2 seconds:
+
+| Component | Status | Values (Test Colony) |
+|-----------|--------|---------------------|
+| Game Version | ✅ | 1.6.4633 (Odyssey) |
+| Mods | ✅ | 267 mods |
+| Game Time | ✅ | Year 5501, Day 113, Decembary |
+| World Info | ✅ | Colony: Algenib, Seed: intestines |
+| Factions | ✅ | 20 with goodwill relations |
+| Colonists | ✅ | 11 with skills, traits, needs |
+| Animals | ✅ | 34 colony animals |
+| Resources | ✅ | 65 item types categorized |
+| Research | ✅ | 310 completed projects |
 
 ---
 
 ## 🏗️ Architecture
 
-The system operates as a read-only external observer during Phase 1, with no game modifications required.
+The system operates as a read-only external observer, progressing toward a Context Augmented Generation (CAG) architecture.
 
-### Data Flow
+### Current Data Flow (Phase 1a)
 
-```mermaid
-graph LR
-    subgraph "RimWorld"
-        A[Autosave .rws]
-    end
-    
-    subgraph "Extraction Layer"
-        B[Python Extractor]
-        C[File Watcher]
-    end
-    
-    subgraph "State Storage"
-        D[JSON Snapshots]
-        E[MD Summaries]
-    end
-    
-    subgraph "Advisory"
-        F[Claude Desktop]
-    end
-    
-    A -->|Manual/Watch| B
-    C -->|Trigger| B
-    B --> D
-    B --> E
-    D -->|FS MCP| F
-    E -->|FS MCP| F
+```
+RimWorld Autosave (.rws)
+        │
+        ▼
+   [lxml Extractor]  ←── Manual CLI
+        │
+        ├──► state/snapshots/colony_{timestamp}.json
+        └──► state/snapshots/colony_{timestamp}.md
+                    │
+                    ▼
+              [Claude FS MCP]
+                    │
+                    ▼
+             Advisory Conversation
+```
+
+### Target Architecture (Phase 1b+)
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ RimWorld        │     │ pgsql01          │     │ Claude          │
+│ (autosaves)     │     │ 10.25.20.8       │     │                 │
+│                 │────▶│ ┌──────────────┐ │◀────│ CrystalDB MCP   │
+│ Saves folder    │     │ │ rimworld_db  │ │     │                 │
+│ watched by      │     │ │ + pgvector   │ │     │ "How's morale   │
+│ Python daemon   │     │ └──────────────┘ │     │  trending?"     │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
 ### Components
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Save Extractor | Python 3.10+ | Parse XML saves into structured JSON |
-| State Storage | JSON/Markdown | Timestamped snapshots and summaries |
-| File Watcher | Python (future) | Auto-trigger extraction on save |
-| Claude Integration | FS MCP | Read state during conversations |
+| Component | Technology | Status |
+|-----------|------------|--------|
+| Save Extractor | Python 3.10+ / lxml | ✅ Working |
+| State Storage | JSON/Markdown | ✅ Working |
+| Database | PostgreSQL + pgvector | ⬜ Planned |
+| File Watcher | Python watchdog | ⬜ Planned |
+| Claude Integration | CrystalDB MCP | ⬜ Planned |
 
 ---
 
@@ -123,15 +139,19 @@ graph LR
 
 ```
 rimworld-ai-colony-coplay/
-├── 📂 game-saves/            # Colony save files (gitignored for now)
+├── 📂 game-saves/            # Colony save files (gitignored)
+│   └── deserters-of-the-rim/ # Test colony
 ├── 📂 .kilocode/             # Agent memory bank
-├── 📂 .reference-data/       # RimAI mod source reference (gitignored)
+│   └── rules/memory-bank/    # Context files
+├── 📂 .internal-files/       # Dev artifacts (gitignored)
+│   └── rimworld-1_6-save-file-xml.md  # GDR research
 ├── 📂 tools/                 # Python tooling
-│   ├── extractor/            # Save file parser
-│   └── watcher/              # File watcher (future)
+│   ├── extractor/            # Save file parser ✅
+│   │   ├── rimworld_extractor.py
+│   │   └── parsers/          # Section parsers
+│   └── watcher/              # File watcher (planned)
 ├── 📂 state/                 # Extracted game state (gitignored)
-│   ├── snapshots/            # Point-in-time JSON
-│   └── history/              # Historical diffs
+│   └── snapshots/            # JSON/Markdown output
 ├── 📂 mod/                   # C# mod source (Phase 2+)
 ├── 📚 docs/                  # Documentation
 ├── 📂 work-logs/             # Development milestones
@@ -143,23 +163,74 @@ rimworld-ai-colony-coplay/
 
 ## 🎮 Extraction Capabilities
 
-The extractor targets 13 data categories from RimWorld saves:
+### Currently Implemented ✅
 
 | Category | Data Extracted |
 |----------|----------------|
-| Colonists | Skills, traits, health, mood, needs, relationships, genes |
-| Resources | Inventory counts, storage utilization |
-| Research | Completed, in-progress, available |
-| Factions | Relations, goodwill, recent interactions |
+| Meta | Game version, mod list (267 mods) |
+| Game Time | Year, day, quadrum, season |
+| World | Colony name, seed, coverage |
+| Factions | 20 factions with LoadID resolution |
+| Relations | Goodwill integers, relation kinds |
+| Colonists | Name, age, skills (12), traits, needs |
+| Animals | Species, faction, master assignment |
+| Resources | 65 item types in 6 categories |
+| Research | Current project, 310 completed |
+
+### Planned 🔲
+
+| Category | Data Extracted |
+|----------|----------------|
 | Buildings | Key structures, power grid, defenses |
 | Zones | Stockpiles, growing zones, restrictions |
-| Animals | Tamed, bonded, training status |
-| Environment | Weather, temperature, season, biome |
 | Threats | Active raids, mechanoids, infestations |
-| Economy | Silver, trade goods, caravan capacity |
-| Priorities | Work priorities, schedules, restrictions |
 | Events | Recent incidents, upcoming triggers |
-| World | Map tiles, settlements, faction bases |
+
+### Known Limitations
+
+| Limitation | Notes |
+|------------|-------|
+| Storyteller/Difficulty | Nested deeper in save, not yet extracted |
+| Gender (modded) | Stored in genes/body type, returns "Unknown" |
+| Compressed world data | `*Deflate` tags ignored (not needed for advisor) |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.10 or higher
+- lxml library (`pip install lxml`)
+- RimWorld 1.6 with autosave enabled
+- Claude Desktop with FS MCP access to this repository
+
+### Quick Start
+
+```powershell
+# Clone repository
+git clone https://github.com/vintagedon/rimworld-ai-colony-coplay.git
+cd rimworld-ai-colony-coplay
+
+# Install dependencies
+pip install lxml
+
+# Run extraction
+cd tools/extractor
+python rimworld_extractor.py "..\..\game-saves\deserters-of-the-rim\Deserters of the Rim#§#Hoeaia.rws" -o ..\..\state\snapshots\
+
+# Review output
+Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 50
+```
+
+### Configuration
+
+RimWorld saves are located at:
+```
+C:\Users\{username}\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\
+```
+
+Configure autosave frequency in RimWorld options for more granular state tracking.
 
 ---
 
@@ -174,39 +245,6 @@ These mods take the in-game terminal approach. This project studies their implem
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.10 or higher
-- RimWorld with autosave enabled (1-2 minute interval recommended)
-- Claude Desktop with FS MCP access to this repository
-
-### Quick Start
-
-```powershell
-# Clone repository
-git clone https://github.com/vintagedon/rimworld-ai-colony-coplay.git
-cd rimworld-ai-colony-coplay
-
-# Run extraction (once extractor is built)
-python tools/extractor/rimworld_extractor.py "path/to/save.rws" -o state/snapshots/
-
-# Start Claude conversation in this project context
-# Claude can now read from state/snapshots/ via FS MCP
-```
-
-### Configuration
-
-RimWorld saves are located at:
-```
-C:\Users\{username}\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\
-```
-
-Configure autosave frequency in RimWorld options for more granular state tracking.
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
@@ -218,8 +256,8 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 - **Ludeon Studios** — RimWorld and its moddable architecture
 - **RimAI Team** — Reference implementations for AI integration
 - **Anthropic** — Claude and the MCP ecosystem
-- **Open source community** — Python XML parsing libraries
+- **lxml Project** — Efficient XML streaming parser
 
 ---
 
-Last Updated: 2026-01-17 | Phase 1 Development
+Last Updated: 2026-01-18 | Phase 1a Complete
