@@ -24,9 +24,9 @@ related_documents:
 | Sessions | 2 |
 | Artifacts | 1 handoff doc, 7 memory bank files, 7 READMEs |
 
-**Objective:** Scaffold repository structure, populate documentation, and prepare for development work.
+Objective: Scaffold repository structure, populate documentation, and prepare for development work.
 
-**Outcome:** Repository fully structured with memory bank, primary README, interior READMEs, and KC handoff document ready for extractor development.
+Outcome: Repository fully structured with memory bank, primary README, interior READMEs, and KC handoff document ready for extractor development.
 
 ---
 
@@ -68,6 +68,7 @@ related_documents:
 ## 4. Artifacts Produced
 
 ### Memory Bank Files
+
 - `brief.md` — Project identity
 - `product.md` — Problems solved, phased roadmap
 - `context.md` — Current state, next steps
@@ -76,6 +77,7 @@ related_documents:
 - `tasks.md` — Workflows and procedures
 
 ### Documentation
+
 - `README.md` — Repository root
 - `tools/README.md` — Tooling overview
 - `tools/extractor/README.md` — Extractor details
@@ -85,16 +87,17 @@ related_documents:
 - `game-saves/README.md` — Colony save organization
 
 ### Development Specs
+
 - `docs/rimworld-extractor-handoff.md` — KC structured prompt
 
 ---
 
 ## 5. Next Phase
 
-**Handoff:** Repository is scaffolded and documented. Memory bank provides agent context. Handoff document is ready for KC execution.
+Handoff: Repository is scaffolded and documented. Memory bank provides agent context. Handoff document is ready for KC execution.
 
-**Next Steps:**
+Next Steps:
 
-1. **M02: GitHub Project Frameout** — Create labels, milestones, tasks, sub-tasks
-2. **Execute KC handoff** — Build initial extractor with KiloCode
-3. **Test extraction** — Validate against Deserters of the Rim saves
+1. M02: GitHub Project Frameout — Create labels, milestones, tasks, sub-tasks
+2. Execute KC handoff — Build initial extractor with KiloCode
+3. Test extraction — Validate against Deserters of the Rim saves

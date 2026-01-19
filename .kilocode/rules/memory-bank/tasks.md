@@ -17,11 +17,11 @@
 **Commands:**
 ```powershell
 cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "C:\Users\donal\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\the-fringe-benefit#§#Autosave-137.rws" -o ..\..\state\snapshots\
 ```
 
 **Expected Outcome:** JSON and MD files in `state/snapshots/` with current timestamp  
-**Expected Output:** ~7 colonists, ~20 factions, ~1000 buildings, ~45 research projects
+**Expected Output:** ~7 colonists, ~357 world pawns, ~20 factions, ~1000 buildings
 
 ---
 
@@ -40,14 +40,16 @@ python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-
 ```powershell
 cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
 
-# Full depth discovery (large output)
-python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws"
+# Full depth discovery (large output — ~343KB, ~85K tokens)
+python schema_discovery.py "<save_file>"
 
 # Limited depth for overview
-python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -d 6
+python schema_discovery.py "<save_file>" -d 6
 ```
 
 **Expected Outcome:** Markdown file with full XML tree structure, depths, sample values
+
+**Note:** Schema files are too large for direct LLM context loading. Use PowerShell `Select-String` for targeted path validation.
 
 ---
 
@@ -85,13 +87,13 @@ python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benef
 cd D:\development-repositories\rimworld-ai-colony-coplay\tools\extractor
 
 # Run extraction
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "<save_file>" -o ..\..\state\snapshots\
 
 # Validate JSON
-python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json')); print(f'Colonists: {len(d[\"colonists\"])}, Buildings: {d[\"buildings\"][\"total_count\"]}')"
+python -c "import json; d=json.load(open('..\..\state\snapshots\colony_*.json')); print(f'Colonists: {len(d[\"colonists\"])}, World Pawns: {len(d.get(\"world_pawns\", []))}')"
 
 # JSON only (faster for testing)
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" --json-only
+python rimworld_extractor_v2.py "<save_file>" --json-only
 ```
 
 ---
@@ -103,12 +105,13 @@ python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-
 
 **Steps:**
 1. Run schema_discovery.py to find the XML path
-2. Add extraction function following existing patterns
-3. Wire into `extract_all()` method
-4. Add to markdown report in `generate_markdown()`
-5. Test against sample save
-6. Add dual-audience comments
-7. Update memory bank if deliverables change
+2. Validate path with `Select-String` against schema file
+3. Add extraction function following existing patterns
+4. Wire into `extract_all()` method
+5. Add to markdown report in `generate_markdown()`
+6. Test against sample save
+7. Add dual-audience comments
+8. Update memory bank if deliverables change
 
 **Pattern to follow:**
 ```python
@@ -134,6 +137,25 @@ def extract_{section}(root: etree._Element) -> dict:
 
 ---
 
+### KiloCode Work Unit Handoff
+
+**When to use:** When delegating implementation to KiloCode agent  
+**Location:** Uses KC structured prompt skill
+
+**Steps:**
+1. Prevalidate XML paths against schema or live save
+2. Document path corrections if plan differs from reality
+3. Create discrete work units (one extraction per unit)
+4. Include validation criteria in each unit
+5. Review implementation against spec after KC completes
+
+**Key Learnings (M04):**
+- Discrete units prevent KC context loss
+- Prevalidation catches path errors before implementation
+- Path corrections should be documented in expansion plan
+
+---
+
 ### Committing Feature Work
 
 **When to use:** After completing a feature or milestone
@@ -149,7 +171,7 @@ def extract_{section}(root: etree._Element) -> dict:
 cd D:\development-repositories\rimworld-ai-colony-coplay
 git add .
 git status  # Review changes
-git commit -m "feat(extractor): add quest extraction with status derivation"
+git commit -m "feat(extractor): add world pawn and psycast extraction (v2.3)"
 ```
 
 ---
@@ -227,9 +249,10 @@ git commit -m "feat(extractor): add quest extraction with status derivation"
 ### Extraction Output Checklist
 - [ ] JSON is valid (parseable)
 - [ ] Colonist count matches expected (~7 for The Fringe Benefit)
+- [ ] World pawns extracted (357 across 4 collections)
 - [ ] Factions have relations populated (not empty arrays)
 - [ ] Buildings total is reasonable (~1000)
-- [ ] Resource counts are reasonable
+- [ ] Resource counts include container contents
 - [ ] No Python exceptions during run
 - [ ] Markdown summary is readable
 

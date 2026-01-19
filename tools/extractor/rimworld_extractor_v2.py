@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RimWorld Save File Extractor v2.2
+RimWorld Save File Extractor v2.3 (Kaggle Expansion)
 
 Schema-driven extractor using XML paths discovered from actual save file analysis.
 This replaces the original hardcoded-path approach that produced "Unknown" values.
@@ -8,10 +8,10 @@ This replaces the original hardcoded-path approach that produced "Unknown" value
 Key insight: RimWorld save files are deeply nested XML (~17 levels deep) with
 mod-specific extensions. Rather than guess paths, we ran schema_discovery.py
 against real saves to map the actual structure. All paths in this file were
-validated against 18MB saves with 270+ mods.
+validated against 22MB saves with 270+ mods.
 
 The extractor uses DOM parsing (lxml) rather than streaming because:
-- File sizes (~18MB) fit comfortably in memory
+- File sizes (~20-25MB) fit comfortably in memory
 - Random access simplifies cross-referencing (e.g., faction ID → name lookups)
 - Streaming would require multiple passes for the same data
 
@@ -21,6 +21,17 @@ Usage:
     python rimworld_extractor_v2.py <save_file.rws> [-o output_dir]
     python rimworld_extractor_v2.py <save_file.rws> --json-only
     python rimworld_extractor_v2.py <save_file.rws> --md-only
+
+Changelog:
+    v2.3 (2026-01-19) - Kaggle Expansion (M03 Batches 1-4)
+        - Batch 1: apparel, primary_weapon, immunity tracking
+        - Batch 2: thought memories, opinion_offset, genes (Biotech)
+        - Batch 3: recursive container scanning for deep storage mods
+        - Batch 4: kidnapped pawns, full world pawn population, abilities/psycasts
+    v2.2 (2026-01-18) - Initial schema-driven extractor
+        - 18+ extraction categories from schema discovery
+        - Work Tab mod support with Complex Jobs
+        - Dual-audience commenting
 """
 
 import argparse
@@ -29,10 +40,9 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from lxml import etree
-
+from lxml import etree  # type: ignore[import-untyped]
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -80,7 +90,7 @@ def ticks_to_days(ticks: int) -> int:
     return ticks // 60000
 
 
-def parse_position(pos_str: str) -> tuple:
+def parse_position(pos_str: str) -> tuple | None:
     """Parse position string like '(45, 67, 0)' into tuple.
     
     RimWorld uses (x, y, z) where y is always 0 for ground-level objects.
@@ -477,6 +487,138 @@ def extract_world_objects(root: etree._Element) -> dict:
     return world_data
 
 
+def extract_kidnapped(root: etree._Element) -> dict:
+    """Extract kidnapped pawns per faction.
+    
+    RimWorld factions track kidnapped pawns in a dedicated list. This enables
+    tracking prisoner exchanges and rescue mission opportunities. The kidnapped
+    element contains pawn references (Thing_HumanXXXX format) - these are
+    internal IDs, not display names.
+    
+    AI NOTE: Even when empty, the kidnapped element exists on most factions.
+    Always check IsNull='True' attribute before iterating to avoid errors.
+    Returns empty dict {} if factionManager not found (defensive).
+    
+    Returns:
+        {faction_name: [pawn_id, ...]} - empty list if no kidnapped
+    """
+    kidnapped = {}
+    
+    faction_manager = root.find('game/world/factionManager')
+    if faction_manager is None:
+        return kidnapped
+    
+    for faction_elem in faction_manager.findall('allFactions/li'):
+        name = get_text(faction_elem.find('name'), 'Unknown')
+        
+        # Check for kidnapped element
+        kidnapped_elem = faction_elem.find('kidnapped')
+        if kidnapped_elem is None or kidnapped_elem.get('IsNull') == 'True':
+            kidnapped[name] = []
+            continue
+        
+        # Extract pawn IDs from kidnapped list
+        pawn_ids = [get_text(li) for li in kidnapped_elem.findall('li')]
+        kidnapped[name] = pawn_ids
+    
+    return kidnapped
+
+
+def extract_world_pawns(root: etree._Element) -> dict:
+    """Extract complete world pawn population with full data.
+    
+    World pawns represent the simulated population outside the player's map.
+    Factions raid each other, take prisoners, pawns die of combat/disease/age.
+    This is the full population dynamics dataset — deaths, faction membership changes,
+    historical relationships.
+    
+    The worldPawns system organizes pawns into four collections:
+    - pawnsAlive: Currently living world pawns (traders, travelers, raiders)
+    - pawnsMothballed: "Sleeping" pawns not currently in use (memory optimization)
+    - pawnsDead: Deceased pawns (death tracking, historical analysis)
+    - pawnsForcefullyKeptAsWorldPawns: Cross-references to pawns stored in other
+      collections (quest-related, special NPCs). These are references only, not full data.
+    
+    Each pawn gets full data via extract_pawn() (skills, traits, health, needs, etc.)
+    plus metadata about which collection they belong to and when they became a world pawn.
+    
+    AI NOTE: Path structure is game/world/worldPawns/{collection}/li. The
+    forcefully_kept collection contains ONLY pawn ID strings (Thing_HumanXXXX),
+    not full pawn elements. becameWorldPawnTickAbs may not exist on all pawns.
+    Always check IsNull='True' on collections before iterating.
+    
+    Returns:
+        {
+            'pawns_alive': [full pawn data, ...],
+            'pawns_mothballed': [full pawn data, ...],
+            'pawns_dead': [full pawn data, ...],
+            'pawns_forcefully_kept': [pawn_id string, ...],
+            'summary': {
+                'alive': int,
+                'mothballed': int,
+                'dead': int,
+                'forcefully_kept': int,
+                'total': int
+            }
+        }
+    """
+    world_pawns_data = {
+        'pawns_alive': [],
+        'pawns_mothballed': [],
+        'pawns_dead': [],
+        'pawns_forcefully_kept': [],
+        'summary': {
+            'alive': 0,
+            'mothballed': 0,
+            'dead': 0,
+            'forcefully_kept': 0,
+            'total': 0
+        }
+    }
+    
+    world_pawns_elem = root.find('game/world/worldPawns')
+    if world_pawns_elem is None:
+        return world_pawns_data
+    
+    # Extract alive, mothballed, and dead pawns with full data
+    pawn_collections = {
+        'alive': 'pawnsAlive',
+        'mothballed': 'pawnsMothballed',
+        'dead': 'pawnsDead',
+    }
+
+    for collection_name, elem_name in pawn_collections.items():
+        collection_elem = world_pawns_elem.find(elem_name)
+        if collection_elem is not None and collection_elem.get('IsNull') != 'True':
+            pawn_list = []
+            for pawn_li in collection_elem.findall('li'):
+                pawn = extract_pawn(pawn_li)
+                pawn['world_pawn_collection'] = collection_name
+                pawn['became_world_pawn_tick'] = get_int(pawn_li.find('becameWorldPawnTickAbs'), 0)
+                pawn_list.append(pawn)
+            
+            data_key = f"pawns_{collection_name}"
+            world_pawns_data[data_key] = pawn_list
+            world_pawns_data['summary'][collection_name] = len(pawn_list)
+    
+    # Extract forcefully kept pawns (references only, no full data)
+    pawns_forcefully_kept_elem = world_pawns_elem.find('pawnsForcefullyKeptAsWorldPawns')
+    if pawns_forcefully_kept_elem is not None and pawns_forcefully_kept_elem.get('IsNull') != 'True':
+        pawn_ids = [get_text(li) for li in pawns_forcefully_kept_elem.findall('li')]
+        world_pawns_data['pawns_forcefully_kept'] = pawn_ids
+        world_pawns_data['summary']['forcefully_kept'] = len(pawn_ids)
+    
+    # Calculate total
+    world_pawns_data['summary']['total'] = (
+        world_pawns_data['summary']['alive'] +
+        world_pawns_data['summary']['mothballed'] +
+        world_pawns_data['summary']['dead'] +
+        world_pawns_data['summary']['forcefully_kept']
+    )
+    
+    return world_pawns_data
+
+
 def extract_work_tab_priorities(root: etree._Element) -> dict:
     """Extract Work Tab mod priorities (detailed per-workgiver priorities).
     
@@ -563,6 +705,259 @@ def extract_work_tab_priorities(root: etree._Element) -> dict:
     return work_data
 
 
+def extract_memories(pawn_elem: etree._Element) -> list:
+    """Extract thought memories from a pawn's Mood need.
+    
+    Thought memories are mood modifiers that explain WHY a pawn's mood is at
+    a particular level. Instead of just seeing "mood is 45", we can see:
+    +12 from 'AteFineFood', -5 from 'AteWithoutTable', -8 from
+    'WitnessedDeath', etc. This enables mood causality analysis and
+    identification of persistent negative mood sources.
+    
+    The Mood need is nested at: pawn/needs/needs/li[def='Mood']/thoughts/memories/memories/li
+    Note the double 'memories' - the outer is a container, inner holds the list.
+    
+    Returns empty list if no memories found (not None) for consistent schema.
+    """
+    memories = []
+    
+    # Find the Mood need among all needs (not at fixed index)
+    needs_elem = pawn_elem.find('needs')
+    if needs_elem is None or needs_elem.get('IsNull') == 'True':
+        return memories
+    
+    for need in needs_elem.findall('needs/li'):
+        def_elem = need.find('def')
+        if def_elem is not None and def_elem.text == 'Mood':
+            # This is the Mood need - navigate to memories
+            thoughts_elem = need.find('thoughts')
+            if thoughts_elem is None:
+                continue
+            
+            memories_container = thoughts_elem.find('memories')
+            if memories_container is None:
+                continue
+            
+            memories_list = memories_container.find('memories')
+            if memories_list is None:
+                continue
+            
+            # Extract each memory
+            for memory_li in memories_list.findall('li'):
+                # Use helper functions with their defaults, then convert to None if element is missing
+                age_elem = memory_li.find('age')
+                stage_elem = memory_li.find('CurStageIndex')
+                mood_elem = memory_li.find('moodPowerFactor')
+                other_elem = memory_li.find('otherPawn')
+                
+                memory: dict[str, Any] = {
+                    'def': get_text(memory_li.find('def')),
+                    'age': get_int(age_elem) if age_elem is not None else None,
+                    'stage_index': get_int(stage_elem) if stage_elem is not None else None,
+                    'mood_offset': get_float(mood_elem) if mood_elem is not None else None,
+                    'other_pawn': get_text(other_elem) if other_elem is not None else None
+                }
+                
+                # Only include memories with a valid def
+                if memory['def']:
+                    memories.append(memory)
+            
+            break  # Found Mood need, no need to check others
+    
+    return memories
+
+
+def extract_container_contents(container_elem: Optional[etree._Element], depth: int = 0, max_depth: int = 5) -> list:
+    """Extract items from nested containers recursively.
+    
+    Many storage mods (Deep Storage, LWM's Deep Storage, etc.) nest items inside
+    buildings using innerContainer elements. This function recursively traverses the
+    container hierarchy to extract all items at any nesting depth.
+    
+    Without this, resource extraction only sees surface-level items (items on the ground)
+    and misses thousands of materials stored inside storage buildings, making resource
+    counts useless for accurate colony state analysis.
+    
+    Args:
+        container_elem: The container element to extract from (can be None)
+        depth: Current recursion depth (for tracking/debugging)
+        max_depth: Maximum nesting depth to prevent infinite recursion on malformed saves
+    
+    Returns:
+        List of item dicts with schema:
+        {
+            'def': str,              # Item definition (e.g., 'Steel', 'ComponentIndustrial')
+            'stack_count': int,      # Count, defaults to 1 if missing
+            'stuff': str or None,    # Material for stuffable items (e.g., 'Steel')
+            'quality': str or None,  # Quality level for crafted items
+            'container_depth': int   # Nesting level (0 = direct child of original container)
+        }
+        Returns empty list [] if no items or container_elem is None (never returns None).
+    
+    AI NOTE: Path structure is container_elem/innerList/li for items at each level.
+    Each item may have an innerContainer child for further nesting. Always check
+    IsNull='True' attribute on containers before recursing. Max depth guard is
+    REQUIRED - malformed saves could cause infinite recursion without it.
+    """
+    items = []
+    
+    # Handle None input gracefully
+    if container_elem is None:
+        return items
+    
+    # Recursion depth guard - prevent infinite loops on malformed saves
+    if depth >= max_depth:
+        return items
+    
+    # Check if container is null (RimWorld uses IsNull='True' for empty containers)
+    if container_elem.get('IsNull') == 'True':
+        return items
+    
+    # Navigate to innerList/li for items at this level
+    inner_list = container_elem.find('innerList')
+    if inner_list is None:
+        return items
+    
+    # Extract each item at this level
+    for item_li in inner_list.findall('li'):
+        item_def = get_text(item_li.find('def'))
+        
+        # Skip items without a def (malformed data)
+        if not item_def:
+            continue
+        
+        # Extract item data with safe getters
+        item: dict[str, Any] = {
+            'def': item_def,
+            'stack_count': get_int(item_li.find('stackCount'), 1),  # Default to 1 if missing
+            'stuff': get_text(item_li.find('stuff')) or None,      # None if not stuffable
+            'quality': get_text(item_li.find('quality')) or None,  # None if no quality
+            'container_depth': depth
+        }
+        
+        items.append(item)
+        
+        # Recurse into nested container if present
+        inner_container = item_li.find('innerContainer')
+        if inner_container is not None and inner_container.get('IsNull') != 'True':
+            # Recursively extract nested items at depth+1
+            nested_items = extract_container_contents(inner_container, depth + 1, max_depth)
+            items.extend(nested_items)
+    
+    return items
+
+
+def extract_abilities(pawn_elem: etree._Element) -> list:
+    """Extract all abilities (psycasts, mod abilities, gene abilities) from a pawn.
+    
+    Abilities are special actions available to pawns, including:
+    - Royalty psycasts (psychic powers with entropy management)
+    - Ideology abilities (granted by precepts)
+    - Mod abilities (VEF, Alpha Animals, etc.)
+    - Gene abilities (from Biotech xenogenes)
+    
+    All abilities go through the unified abilities/abilities/li path. The
+    ability def name identifies the specific ability (e.g., 'SpikeLaunch_Toughspike',
+    'VEF_ControlledDetonation', 'PsychicShock_Lv2').
+    
+    Returns empty list [] if no abilities found (not None) for consistent schema.
+    
+    AI NOTE: Path is pawn_elem/abilities/abilities/li (note: 'abilities' appears twice).
+    Always check IsNull='True' attribute before iterating. Optional fields like
+    maxCharges, charges, cooldownTicks should only be included if present.
+    """
+    abilities = []
+    
+    # Navigate to abilities container
+    abilities_container = pawn_elem.find('abilities')
+    if abilities_container is None or abilities_container.get('IsNull') == 'True':
+        return abilities
+    
+    # Inner abilities/abilities/li holds the actual ability list
+    abilities_list = abilities_container.find('abilities')
+    if abilities_list is None or abilities_list.get('IsNull') == 'True':
+        return abilities
+    
+    # Extract each ability
+    for ability_li in abilities_list.findall('li'):
+        ability: dict[str, Any] = {
+            'def': get_text(ability_li.find('def'))
+        }
+        
+        # Optional: source precept (for Ideology abilities)
+        source_precept = get_text(ability_li.find('sourcePrecept'))
+        if source_precept:
+            ability['source_precept'] = source_precept
+        
+        # Optional: charge-based abilities (maxCharges, current charges)
+        max_charges = get_int(ability_li.find('maxCharges'))
+        if max_charges > 0:
+            ability['max_charges'] = max_charges
+            ability['charges'] = get_int(ability_li.find('charges'))
+        
+        # Optional: cooldown tracking (if ability is on cooldown)
+        cooldown = get_int(ability_li.find('cooldownTicks'))
+        if cooldown > 0:
+            ability['cooldown_ticks'] = cooldown
+        
+        # Only include abilities with a valid def
+        if ability['def']:
+            abilities.append(ability)
+    
+    return abilities
+
+
+def extract_psychic_entropy(pawn_elem: etree._Element) -> dict | None:
+    """Extract psychic entropy data for psycasters (Royalty DLC).
+    
+    Psychic entropy is the resource system for psycasts. Pawns with psylink
+    (Royalty DLC) generate entropy when using psycasts and dissipate it
+    over time. If entropy exceeds max, the pawn suffers a psychic breakdown.
+    
+    Psyfocus is a separate resource that boosts psycast power. Higher psyfocus
+    = stronger psycasts but slower entropy dissipation.
+    
+    Returns None if pawn is not a psycaster (no psychicEntropy element).
+    Returns dict with current/max entropy, psyfocus, and psylink level if present.
+    
+    AI NOTE: Path is pawn_elem/psychicEntropy/*. The element may be empty
+    or missing for non-psycasters. Psylink level is stored as a hediff
+    (Hediff_Psylink) in healthTracker, not in psychicEntropy itself.
+    """
+    # Navigate to psychic entropy tracker
+    entropy_elem = pawn_elem.find('psychicEntropy')
+    if entropy_elem is None or entropy_elem.get('IsNull') == 'True':
+        return None
+    
+    # Extract entropy and psyfocus values
+    current_entropy = get_float(entropy_elem.find('currentEntropy'))
+    max_entropy = get_float(entropy_elem.find('maxEntropy'))
+    target_psyfocus = get_float(entropy_elem.find('targetPsyfocus'))
+    current_psyfocus = get_float(entropy_elem.find('currentPsyfocus'))
+    
+    # If all values are 0, this pawn likely has no psylink
+    if current_entropy == 0 and max_entropy == 0 and target_psyfocus == 0:
+        return None
+    
+    # Extract psylink level from hediffs (Hediff_Psylink)
+    psylink_level = 0
+    health_tracker = pawn_elem.find('healthTracker')
+    if health_tracker is not None:
+        for hediff in health_tracker.findall('hediffSet/hediffs/li'):
+            hediff_def = get_text(hediff.find('def'))
+            if hediff_def == 'Hediff_Psylink':
+                psylink_level = get_int(hediff.find('severity'))
+                break
+    
+    return {
+        'current_entropy': current_entropy,
+        'max_entropy': max_entropy,
+        'target_psyfocus': target_psyfocus,
+        'current_psyfocus': current_psyfocus,
+        'psylink_level': psylink_level
+    }
+
+
 def extract_pawn(pawn_elem: etree._Element) -> dict:
     """Extract full pawn data from a thing element.
     
@@ -570,11 +965,21 @@ def extract_pawn(pawn_elem: etree._Element) -> dict:
     in heavily modded games. This extracts the core data needed for AI
     advisory: skills, traits, health, needs, relations.
     
+    This function is the extraction workhorse - called for:
+    - Map colonists and animals (via extract_map_pawns)
+    - World pawns in all collections (via extract_world_pawns)
+    
     AI NOTE: Many pawn sub-elements use IsNull="True" attribute when empty
     rather than being absent. Always check for this attribute before
     iterating children, or you'll get empty results.
+    
+    AI NOTE: This function calls three helper extractors:
+    - extract_memories() for mood causality data
+    - extract_abilities() for psycasts and mod abilities  
+    - extract_psychic_entropy() for Royalty psycaster state
+    These helpers must be defined BEFORE this function in the file.
     """
-    pawn = {
+    pawn: dict[str, Any] = {
         'id': get_text(pawn_elem.find('id')),
         'def': get_text(pawn_elem.find('def')),
         'kind_def': get_text(pawn_elem.find('kindDef')),
@@ -676,6 +1081,10 @@ def extract_pawn(pawn_elem: etree._Element) -> dict:
             need_level = get_float(need.find('curLevel'))
             if need_def:
                 pawn['needs'][need_def] = round(need_level, 3)
+    
+    # Thought memories - mood modifiers that explain WHY mood is at its current level
+    # Extracted from the Mood need's nested structure
+    pawn['memories'] = extract_memories(pawn_elem)
 
     # Social relations (family, friends, rivals)
     social = pawn_elem.find('social')
@@ -684,7 +1093,8 @@ def extract_pawn(pawn_elem: etree._Element) -> dict:
         for rel in social.findall('directRelations/li'):
             pawn['relations'].append({
                 'def': get_text(rel.find('def')),
-                'other_pawn': get_text(rel.find('otherPawn'))
+                'other_pawn': get_text(rel.find('otherPawn')),
+                'opinion_offset': get_int(rel.find('opinionOffset'))
             })
 
     # Training (for animals) - what commands they've learned
@@ -697,6 +1107,118 @@ def extract_pawn(pawn_elem: etree._Element) -> dict:
         learned_vals = training.find('learned/vals')
         if learned_vals is not None:
             pawn['training']['learned'] = [get_text(li) for li in learned_vals.findall('li')]
+
+    # Apparel - worn clothing and armor
+    # Equipment data enables combat effectiveness modeling: armor values come from
+    # def+stuff+quality combinations. Health tracking shows wear state.
+    #
+    # AI NOTE: Path is apparel/wornApparel/innerList/li. The wornApparel element
+    # uses innerList (not direct children) because it's a ThingOwner container.
+    # Always initialize to empty list for consistent schema across all pawns.
+    pawn['apparel'] = []
+    apparel = pawn_elem.find('apparel')
+    if apparel is not None and apparel.get('IsNull') != 'True':
+        worn_apparel = apparel.find('wornApparel/innerList')
+        if worn_apparel is not None:
+            for apparel_item in worn_apparel.findall('li'):
+                item_data = {
+                    'def': get_text(apparel_item.find('def')),
+                    'stuff': get_text(apparel_item.find('stuff')),
+                    'quality': get_text(apparel_item.find('quality')),
+                    'health': get_int(apparel_item.find('health'))
+                }
+                pawn['apparel'].append(item_data)
+
+    # Primary weapon - equipped weapon (first item in equipment list)
+    # RimWorld pawns can only equip one primary weapon at a time. The equipment
+    # list theoretically supports multiple items but vanilla uses slot 0 only.
+    # Stuff/quality affect DPS calculations; health shows degradation.
+    #
+    # AI NOTE: Path is equipment/equipment/innerList/li (note: 'equipment' twice).
+    # We take the first li only because that's the primary weapon slot.
+    # Returns None (not empty dict) when pawn is unarmed for clear null semantics.
+    pawn['primary_weapon'] = None
+    equipment = pawn_elem.find('equipment')
+    if equipment is not None and equipment.get('IsNull') != 'True':
+        equipment_list = equipment.find('equipment/innerList')
+        if equipment_list is not None:
+            primary_weapon_elem = equipment_list.find('li')
+            if primary_weapon_elem is not None:
+                pawn['primary_weapon'] = {
+                    'def': get_text(primary_weapon_elem.find('def')),
+                    'stuff': get_text(primary_weapon_elem.find('stuff')),
+                    'quality': get_text(primary_weapon_elem.find('quality')),
+                    'health': get_int(primary_weapon_elem.find('health'))
+                }
+
+    # Immunity tracking - disease survival prediction
+    # When a colonist contracts a disease (plague, flu, malaria, etc.),
+    # immunity builds up from 0.0 to 1.0. If immunity reaches 1.0 before
+    # disease severity becomes lethal, the colonist survives. This data enables
+    # alerting when immunity is losing the race and prioritizing medical care.
+    # 
+    # AI NOTE: The path uses `imList` not `immunityList` - a RimWorld
+    # naming quirk. Each immunity record references a hediff (the active infection)
+    # via `hediff` or `source` element. Immunity progress is a 0.0-1.0 float.
+    # Always initialize to empty list for consistent schema across all pawns.
+    pawn['immunity'] = []
+    immunity_elem = health_tracker.find('immunity') if health_tracker is not None else None
+    if immunity_elem is not None and immunity_elem.get('IsNull') != 'True':
+        im_list = immunity_elem.find('imList')
+        if im_list is not None:
+            for immunity_li in im_list.findall('li'):
+                immunity_record = {
+                    'hediff': get_text(immunity_li.find('hediff')) or get_text(immunity_li.find('source')),
+                    'immunity': get_float(immunity_li.find('immunity'))
+                }
+                # Only include records with valid hediff reference
+                if immunity_record['hediff']:
+                    pawn['immunity'].append(immunity_record)
+
+    # Biotech genes - xenotype, endogenes (inherited), xenogenes (implanted)
+    # Genes define genetic traits, abilities, and weaknesses. Endogenes are inherited
+    # from parents, xenogenes are implanted via xenogerms. Xenotype is the
+    # archetype (Baseliner, Hussar, Waster, etc.) or custom name.
+    # 
+    # AI NOTE: Genes element uses IsNull="True" for non-Biotech NPCs.
+    # Always check this attribute before iterating. Gene defs are strings like
+    # "Gene_MuscleHypertrophy" or "Gene_ArchiteWing".
+    genes_elem = pawn_elem.find('genes')
+    if genes_elem is not None and genes_elem.get('IsNull') != 'True':
+        genes_data = {
+            'xenotype': get_text(genes_elem.find('xenotype')),
+            'xenotype_name': get_text(genes_elem.find('xenotypeName')),
+            'endogenes': [],
+            'xenogenes': []
+        }
+
+        # Endogenes: inherited genetic traits
+        endogenes_elem = genes_elem.find('endogenes')
+        if endogenes_elem is not None:
+            for gene_li in endogenes_elem.findall('li'):
+                gene_def = get_text(gene_li.find('def'))
+                if gene_def:
+                    genes_data['endogenes'].append(gene_def)
+
+        # Xenogenes: implanted genetic modifications
+        xenogenes_elem = genes_elem.find('xenogenes')
+        if xenogenes_elem is not None:
+            for gene_li in xenogenes_elem.findall('li'):
+                gene_def = get_text(gene_li.find('def'))
+                if gene_def:
+                    genes_data['xenogenes'].append(gene_def)
+
+        pawn['genes'] = genes_data
+
+    # Abilities (psycasts, mod abilities, gene abilities)
+    # Extract all special actions available to pawn
+    pawn['abilities'] = extract_abilities(pawn_elem)
+
+    # Psychic entropy (Royalty psycaster data)
+    # Only include if pawn has psylink (returns None for non-psycasters)
+    psychic_entropy = extract_psychic_entropy(pawn_elem)
+    if psychic_entropy is not None:
+        pawn['psychic_entropy'] = psychic_entropy
 
     # Vanilla work priorities (if Work Tab mod not present)
     work_settings = pawn_elem.find('workSettings')
@@ -758,11 +1280,15 @@ def extract_map_pawns(root: etree._Element) -> tuple[list, list]:
     return colonists, animals
 
 
-def extract_resources(root: etree._Element) -> dict:
-    """Extract stockpiled resources from map things.
+def extract_resources_surface(root: etree._Element) -> dict:
+    """Extract stockpiled resources from surface-level map things.
     
     Resources are ThingWithComps (stackable items) and MinifiedThing
     (uninstalled furniture/buildings). We sum stackCount by def name.
+    
+    This is the surface-only variant - it misses items stored inside
+    building containers (Deep Storage, LWM's Deep Storage, etc.).
+    Use extract_resources_deep() for complete resource counts including containers.
     """
     resources = {}
 
@@ -782,6 +1308,58 @@ def extract_resources(root: etree._Element) -> dict:
     return resources
 
 
+def extract_resources_deep(root: etree._Element) -> dict:
+    """Extract stockpiled resources including items inside storage containers.
+    
+    Many storage mods (Deep Storage, LWM's Deep Storage, etc.) nest items
+    inside buildings using innerContainer elements. Surface-only extraction misses
+    these items, leading to drastically incorrect resource counts in modded colonies.
+    
+    This function performs two scans:
+    1. Surface scan: ThingWithComps and MinifiedThing on the ground (same as surface variant)
+    2. Container scan: All things with innerContainer elements (storage buildings)
+    
+    Both sources aggregate into a single {def_name: total_count} dict.
+    
+    AI NOTE: The container scan iterates ALL things, not just ThingWithComps,
+    because innerContainer can appear on Building and other types. We use
+    extract_container_contents() helper for recursive traversal of nested containers.
+    Always check IsNull='True' before accessing innerContainer to avoid errors.
+    
+    AI NOTE: This function depends on extract_container_contents() being defined
+    earlier in the file. If modifying container extraction logic, update both
+    functions together to maintain consistency.
+    """
+    resources = {}
+
+    # Single pass: surface items and container contents together
+    for map_elem in root.findall('game/maps/li'):
+        things = map_elem.find('things')
+        if things is None:
+            continue
+
+        for thing in things.findall('thing'):
+            # Surface items (ThingWithComps, MinifiedThing on ground)
+            thing_class = thing.get('Class', '')
+            if thing_class in ('ThingWithComps', 'MinifiedThing'):
+                def_name = get_text(thing.find('def'))
+                stack_count = get_int(thing.find('stackCount'), 1)
+                if def_name:
+                    resources[def_name] = resources.get(def_name, 0) + stack_count
+
+            # Container contents (items inside storage buildings)
+            inner_container = thing.find('innerContainer')
+            if inner_container is not None and inner_container.get('IsNull') != 'True':
+                container_items = extract_container_contents(inner_container, depth=0, max_depth=5)
+                for item in container_items:
+                    def_name = item['def']
+                    stack_count = item['stack_count']
+                    if def_name:
+                        resources[def_name] = resources.get(def_name, 0) + stack_count
+
+    return resources
+
+
 def extract_building(thing_elem: etree._Element) -> dict:
     """Extract building data from a thing element.
     
@@ -789,7 +1367,7 @@ def extract_building(thing_elem: etree._Element) -> dict:
     powerOn, generators have fuel, temperature controls have targetTemperature.
     We extract all fields when present.
     """
-    building = {
+    building: dict[str, Any] = {
         'id': get_text(thing_elem.find('id')),
         'def': get_text(thing_elem.find('def')),
         'class': thing_elem.get('Class', ''),
@@ -1298,6 +1876,12 @@ class RimWorldExtractorV2:
     
     Orchestrates all extraction functions and manages the DOM tree lifecycle.
     Designed for single-use: instantiate, call extract_all(), discard.
+    
+    AI NOTE: Extraction order matters for cross-referencing. Factions MUST be
+    extracted before pawns (map_pawns, world_pawns) because pawn extraction
+    needs the player faction ID for filtering colonists vs NPCs. The faction
+    lookup map uses "Faction_<loadID>" format which must match pawn faction
+    references exactly.
     """
 
     def __init__(self, save_path: str):
@@ -1347,7 +1931,7 @@ class RimWorldExtractorV2:
         data['animals'] = animals
 
         print("Extracting resources...")
-        data['resources'] = extract_resources(self.root)
+        data['resources'] = extract_resources_deep(self.root)
 
         print("Extracting buildings...")
         data['buildings'] = extract_buildings(self.root)
@@ -1373,6 +1957,12 @@ class RimWorldExtractorV2:
         print("Extracting world objects...")
         data['world'] = extract_world_objects(self.root)
 
+        print("Extracting kidnapped pawns...")
+        data['kidnapped'] = extract_kidnapped(self.root)
+        
+        print("Extracting world pawns...")
+        data['world_pawns'] = extract_world_pawns(self.root)
+        
         print("Extracting Work Tab priorities...")
         data['work_tab'] = extract_work_tab_priorities(self.root)
 
@@ -1500,6 +2090,41 @@ def generate_markdown(data: dict) -> str:
                 lines.append(f"- ... and {len(world['ruins']) - 10} more")
             lines.append("")
 
+    # Kidnapped Pawns
+    kidnapped = data.get('kidnapped', {})
+    factions_with_kidnapped = {fname: pids for fname, pids in kidnapped.items() if pids}
+    
+    lines.append("## Kidnapped Pawns")
+    lines.append("")
+    
+    if factions_with_kidnapped:
+        for fname, pawn_ids in sorted(factions_with_kidnapped.items(), key=lambda x: -len(x[1])):
+            lines.append(f"- {fname}: {len(pawn_ids)} kidnapped")
+            for pid in pawn_ids[:5]:  # Show up to 5 pawn IDs
+                lines.append(f"  - {pid}")
+            if len(pawn_ids) > 5:
+                lines.append(f"  - ... and {len(pawn_ids) - 5} more")
+    else:
+        lines.append("None")
+    
+    lines.append("")
+    
+    # World Pawns
+    world_pawns = data.get('world_pawns', {})
+    summary = world_pawns.get('summary', {})
+    
+    lines.append("## World Pawns")
+    lines.append("")
+    lines.append(f"**Total World Population:** {summary.get('total', 0)}")
+    lines.append("")
+    lines.append("| Collection | Count |")
+    lines.append("|-----------|-------|")
+    lines.append(f"| Alive | {summary.get('alive', 0)} |")
+    lines.append(f"| Mothballed | {summary.get('mothballed', 0)} |")
+    lines.append(f"| Dead | {summary.get('dead', 0)} |")
+    lines.append(f"| Forcefully Kept (references) | {summary.get('forcefully_kept', 0)} |")
+    lines.append("")
+    
     # Factions
     lines.append("## Factions")
     lines.append("")
@@ -1578,6 +2203,25 @@ def generate_markdown(data: dict) -> str:
                 elif skill.get('passion') == 'Minor':
                     passion_mark = ' ★'
                 lines.append(f"- {skill['def']}: {skill.get('level', 0)}{passion_mark}")
+            lines.append("")
+
+        # Biotech genes
+        genes = colonist.get('genes')
+        if genes:
+            lines.append("**Genes (Biotech):**")
+            lines.append("")
+            xenotype = genes.get('xenotype')
+            if xenotype:
+                lines.append(f"- Xenotype: {xenotype}")
+            xenotype_name = genes.get('xenotype_name')
+            if xenotype_name:
+                lines.append(f"- Custom Xenotype Name: {xenotype_name}")
+            endogenes = genes.get('endogenes', [])
+            if endogenes:
+                lines.append(f"- Endogenes (inherited): {len(endogenes)} genes")
+            xenogenes = genes.get('xenogenes', [])
+            if xenogenes:
+                lines.append(f"- Xenogenes (implanted): {len(xenogenes)} genes")
             lines.append("")
 
         hediffs = colonist.get('health', {}).get('hediffs', [])

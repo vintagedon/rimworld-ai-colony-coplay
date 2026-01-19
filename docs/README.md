@@ -30,7 +30,10 @@ docs/
 │   ├── script-header-*.md
 │   ├── tagging-strategy.md
 │   └── README.md
-├── rimworld-extractor-handoff.md   # KC structured prompt for extractor
+├── data-science-infrastructure.md  # Infrastructure for ML/data work
+├── rimworld-save-schema-kb.md      # RimWorld XML structure guide
+├── schema_*-depth-6.md             # Schema discovery (6 levels)
+├── schema_*-full-depth.md          # Schema discovery (full 17 levels)
 └── README.md                       # This file
 ```
 
@@ -48,7 +51,10 @@ docs/
 
 | Document | Description |
 |----------|-------------|
-| [rimworld-extractor-handoff.md](rimworld-extractor-handoff.md) | KC structured prompt for building the RimWorld save file extractor |
+| [rimworld-save-schema-kb.md](rimworld-save-schema-kb.md) | Guide to RimWorld save XML structure and path patterns |
+| [data-science-infrastructure.md](data-science-infrastructure.md) | Infrastructure for ML and data science workloads |
+| [schema_*-depth-6.md](schema_the-fringe-benefit-autosave-129-depth-6.md) | Schema discovery output (6 levels deep) |
+| [schema_*-full-depth.md](schema_the-fringe-benefit-autosave-129-full-depth.md) | Schema discovery output (full 17 levels) |
 
 ---
 

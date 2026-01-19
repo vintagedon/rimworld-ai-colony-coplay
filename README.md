@@ -3,8 +3,8 @@
 title: "RimWorld AI Colony Co-Play"
 description: "External AI advisor for RimWorld colony management via save file analysis"
 author: "VintageDon"
-date: "2026-01-18"
-version: "0.3.0"
+date: "2026-01-19"
+version: "0.4.0"
 status: "Development"
 tags:
   - type: project-root
@@ -50,32 +50,63 @@ The result is an AI companion that knows your colonists by name, remembers that 
 | Milestone | Status | Description |
 |-----------|--------|-------------|
 | M01: Ideation & Setup | ✅ Complete | Repository scaffolding, documentation |
-| M02: Extractor Phase 1 | ✅ Complete | Schema discovery, v2 extractor, full extraction |
-| M03: Database Storage | ⬜ Planned | PostgreSQL with pgvector + TimescaleDB |
-| M04: File Watcher | ⬜ Planned | Auto-extract on new saves |
-| M05: MCP Integration | ⬜ Planned | CrystalDB MCP for Claude queries |
+| M02: Extractor Phase 1 | ✅ Complete | Schema discovery, base extractor (v2.0) |
+| M03: Extractor Phase 2 | ✅ Complete | Full extraction suite, Work Tab, dual-audience comments (v2.2) |
+| M04: Extractor Phase 3 | ✅ Complete | Kaggle expansion — deep pawn, world state, containers (v2.3) |
+| M05: Database Storage | ⬜ Planned | PostgreSQL with pgvector + TimescaleDB |
+| M06: File Watcher | ⬜ Planned | Auto-extract on new saves |
+| M07: MCP Integration | ⬜ Planned | CrystalDB MCP for Claude queries |
 | Phase 2: Export Mod | ⬜ Future | C# mod for real-time state export |
 
-### Current Capabilities
+### Current Capabilities (v2.3)
 
-The v2.2 extractor processes 18MB modded save files in ~3 seconds with 18+ extraction categories:
+The extractor processes 18MB+ modded save files in ~3 seconds with comprehensive extraction across colony state, pawn psychology, genetics, social graphs, and world population.
+
+#### Colony State
 
 | Category | Status | Test Colony Values |
 |----------|--------|-------------------|
-| Meta (version, mods) | ✅ | 270 mods |
-| Game Time | ✅ | Year 5501, Aprimay, Day 5 |
-| Storyteller | ✅ | Ariadne Archduchess |
-| Factions | ✅ | 20+ with goodwill relations |
-| Colonists | ✅ | 7 with full profiles |
-| Animals | ✅ | 2 colony animals |
+| Meta (version, mods) | ✅ | 270+ mods |
+| Game Time | ✅ | Year 5501, Aprimay |
+| Storyteller & Difficulty | ✅ | Ariadne Archduchess |
+| Factions | ✅ | 20+ with bidirectional goodwill |
 | Buildings | ✅ | 1,002 categorized |
 | Zones | ✅ | 8 (growing + stockpile) |
 | Research | ✅ | 45 completed projects |
-| Quests | ✅ | Active/completed with status |
+| Resources (deep) | ✅ | Recursive container scanning |
+| Quests | ✅ | Active/completed with status derivation |
 | World Objects | ✅ | 441 (settlements, Real Ruins, sites) |
-| Work Tab | ✅ | 225 workgivers per pawn |
-| Power Network | ✅ | Batteries, generators, fuel |
+| Work Tab | ✅ | 225 workgivers/pawn (0-9 scale) |
+| Power Network | ✅ | Batteries, generators, fuel levels |
 | Play/Battle Logs | ✅ | Social + combat events |
+| Tales | ✅ | Colony history events |
+
+#### Pawn Extraction
+
+| Field | Status | Notes |
+|-------|--------|-------|
+| Identity | ✅ | Name, age, gender, faction |
+| Skills | ✅ | All skills with level + passion |
+| Traits | ✅ | Full trait list |
+| Health | ✅ | Hediffs (injuries, conditions, implants) |
+| Needs | ✅ | Current need levels |
+| Relations | ✅ | Family and social relations |
+| Apparel | ✅ | Worn items with def, stuff, quality, health |
+| Primary Weapon | ✅ | Equipped weapon with quality |
+| Immunity | ✅ | Disease immunity progress per hediff |
+| Memories | ✅ | Thought memories (mood breakdown) |
+| Opinions | ✅ | `opinion_offset` from social graph edges |
+| Genes | ✅ | Xenotype, endogenes, xenogenes (Biotech DLC) |
+| Psycasts | ✅ | Abilities, entropy, psyfocus (Royalty DLC) |
+
+#### World State
+
+| Category | Status | Notes |
+|----------|--------|-------|
+| World Pawns | ✅ | 357 NPCs across 4 collections (dead, captured, left, mothballed) |
+| Kidnapped | ✅ | Per-faction captive tracking |
+| Settlements | ✅ | 371 faction bases |
+| Real Ruins | ✅ | 50 POIs with wealth data |
 
 ---
 
@@ -92,7 +123,7 @@ The system operates as a read-only external observer, progressing toward a Conte
 | Component | Technology | Status |
 |-----------|------------|--------|
 | Schema Discovery | Python / lxml | ✅ Working |
-| Save Extractor v2 | Python / lxml | ✅ Working |
+| Save Extractor v2.3 | Python / lxml | ✅ Working |
 | State Storage | JSON/Markdown | ✅ Working |
 | Database | PostgreSQL + pgvector + TimescaleDB | ⬜ Planned |
 | Graph Database | Neo4j | ⬜ Planned |
@@ -110,6 +141,7 @@ rimworld-ai-colony-coplay/
 ├── 📂 game-saves/            # Colony save files
 │   └── the-fringe-benefit/   # Current test colony (public)
 ├── 📂 mod/                   # C# mod source (Phase 2+)
+├── 📂 scratch/               # Planning documents
 ├── 📂 shared/                # Cross-project utilities
 ├── 📂 state/                 # Extracted game state
 │   └── snapshots/            # JSON/Markdown output
@@ -141,17 +173,18 @@ cd rimworld-ai-colony-coplay
 # Install dependencies
 pip install lxml
 
-# Run extraction on test colony
+# Run extraction on a save file
 cd tools/extractor
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\the-fringe-benefit\
+python rimworld_extractor_v2.py "<path_to_save.rws>" -o ..\..\state\snapshots\
 
 # Review output
-Get-Content ..\..\state\snapshots\the-fringe-benefit\colony_*.md | Select-Object -First 100
+Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 100
 ```
 
 ### Configuration
 
 RimWorld saves are located at:
+
 ```
 C:\Users\{username}\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\
 ```
@@ -182,10 +215,10 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 ## 🙏 Acknowledgments
 
-- **Ludeon Studios** — RimWorld and its moddable architecture
-- **Anthropic** — Claude and the MCP ecosystem
-- **lxml Project** — Efficient XML parsing
+- Ludeon Studios — RimWorld and its moddable architecture
+- Anthropic — Claude and the MCP ecosystem
+- lxml Project — Efficient XML parsing
 
 ---
 
-Last Updated: 2026-01-18 | M02 Complete
+Last Updated: 2026-01-19 | M04 Complete | Extractor v2.3
