@@ -60,7 +60,7 @@ pip install lxml
 
 # Run extractor
 cd tools/extractor
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "<save_file>" -o ..\..\state\snapshots\
 ```
 
 ### Environment Variables / Configuration
@@ -102,6 +102,56 @@ python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-
 - Input: .rws files (XML with CRLF line endings)
 - Output: UTF-8 JSON and Markdown
 
+## Extraction Capabilities (v2.3)
+
+### Core Extraction
+| Category | Description | Since |
+|----------|-------------|-------|
+| Meta | Version, mod list with load order | v2.0 |
+| Game time | Ticks, date, storyteller, difficulty | v2.0 |
+| Colony stats | Adaptation, raid count, peak population | v2.0 |
+| Factions | Bidirectional relations, goodwill | v2.0 |
+| Research | Completed + in-progress | v2.0 |
+| Buildings | Categorized (production, defense, power, etc.) | v2.2 |
+| Zones | Growing, stockpile with cell counts | v2.2 |
+| Power network | Batteries, generators, fuel levels | v2.2 |
+| Quests | Status derivation from parts | v2.2 |
+| World objects | Settlements, Real Ruins, sites | v2.2 |
+| Work Tab | 0-9 priorities, ~225 workgivers/pawn | v2.2 |
+| Logs | Play log, battle log, tales | v2.2 |
+
+### Pawn Extraction
+| Field | Description | Since |
+|-------|-------------|-------|
+| Basic | Name, age, gender, faction | v2.0 |
+| Skills | All skills with levels and passion | v2.0 |
+| Traits | All traits | v2.0 |
+| Health | Hediffs (injuries, conditions) | v2.0 |
+| Needs | Current need levels | v2.0 |
+| Relations | Family and social relations | v2.0 |
+| Apparel | Worn items with quality | v2.3 |
+| Primary weapon | Equipped weapon | v2.3 |
+| Immunity | Disease immunity progress | v2.3 |
+| Memories | Thought memories (mood breakdown) | v2.3 |
+| Opinions | `opinion_offset` from social graph | v2.3 |
+| Genes | Xenotype, endogenes, xenogenes (Biotech) | v2.3 |
+| Psycasts | Abilities, entropy, psyfocus (Royalty) | v2.3 |
+
+### World State (v2.3)
+| Category | Description |
+|----------|-------------|
+| World pawns | Dead, captured, left (4 collections, ~357 NPCs) |
+| Kidnapped | Per-faction captive tracking |
+| Resources (deep) | Recursive container scanning |
+
+### Not Yet Implemented
+| Category | Notes |
+|----------|-------|
+| `recordsDeflate` | Lifetime stats — needs Base64 + zlib decompression |
+| Drug policies | Medium priority |
+| Outfit policies | Medium priority |
+| Ideology precepts | Low priority |
+
 ## Development Workflow
 
 ### Version Control
@@ -114,10 +164,10 @@ python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-
 ```powershell
 # Run schema discovery (to understand save structure)
 cd tools/extractor
-python schema_discovery.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws"
+python schema_discovery.py "<save_file>"
 
 # Run extraction against test save
-python rimworld_extractor_v2.py "..\..\game-saves\the-fringe-benefit\the-fringe-benefit#§#Autosave-129.rws" -o ..\..\state\snapshots\
+python rimworld_extractor_v2.py "<save_file>" -o ..\..\state\snapshots\
 
 # Check output
 Get-Content ..\..\state\snapshots\colony_*.md | Select-Object -First 100
@@ -134,7 +184,7 @@ python rimworld_extractor_v2.py <save_file> [-o output_dir] [--json-only] [--md-
 ## File Locations
 
 ### Scripts
-- `tools/extractor/rimworld_extractor_v2.py` — Main extraction script (v2.2, schema-driven)
+- `tools/extractor/rimworld_extractor_v2.py` — Main extraction script (v2.3, Kaggle expansion)
 - `tools/extractor/schema_discovery.py` — XML structure analysis tool
 - `tools/extractor/rimworld_extractor.py` — Legacy v1 extractor (reference only)
 - `tools/extractor/parsers/` — Legacy modular parsers (reference only)
@@ -148,6 +198,7 @@ python rimworld_extractor_v2.py <save_file> [-o output_dir] [--json-only] [--md-
 - `.kilocode/rules/memory-bank/` — Agent context files
 - `work-logs/` — Phase completion records
 - `docs/documentation-standards/` — Templates
+- `scratch/extractor-v23-kaggle-expansion-plan.md` — M04 planning document
 
 ## Troubleshooting
 
@@ -169,25 +220,33 @@ python rimworld_extractor_v2.py <save_file> [-o output_dir] [--json-only] [--md-
 **Problem:** Work Tab priorities use pawn references, not names  
 **Solution:** Known limitation — cross-reference resolution planned for future version
 
+#### Schema file too large for LLM context
+**Problem:** Schema discovery output is ~343KB (~85K tokens)  
+**Solution:** Use PowerShell `Select-String` for targeted path validation instead of loading full file
+
 ### Debug Commands
 
 ```powershell
 # Check save file size
-(Get-Item "game-saves\the-fringe-benefit\*.rws").Length / 1MB
+(Get-Item "<save_file>").Length / 1MB
 
 # View extraction output summary
 Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty colonists | Select-Object -ExpandProperty name
 
-# Check faction relations
-Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty factions | Where-Object is_player
+# Check world pawn count
+Get-Content state\snapshots\colony_*.json | ConvertFrom-Json | Select-Object -ExpandProperty world_pawns | Measure-Object
+
+# Validate path against schema
+Select-String -Path "schema_*.md" -Pattern "immunity"
 
 # Run schema discovery for debugging
-python tools\extractor\schema_discovery.py "game-saves\the-fringe-benefit\*.rws" -d 8
+python tools\extractor\schema_discovery.py "<save_file>" -d 8
 ```
 
 ## Technical Documentation
 
 - **Schema Discovery Output:** `.internal-files/schema_*.md` — Actual XML structure from saves
+- **Expansion Plan:** `scratch/extractor-v23-kaggle-expansion-plan.md` — M04 batch planning
 - **lxml Docs:** https://lxml.de/parsing.html
 - **RimWorld Wiki:** Save file format documentation (1.2-era, mostly still valid)
 
@@ -196,7 +255,7 @@ python tools\extractor\schema_discovery.py "game-saves\the-fringe-benefit\*.rws"
 ```
 usage: rimworld_extractor_v2.py [-h] [-o OUTPUT] [--json-only] [--md-only] save_file
 
-Extract data from RimWorld save files (v2.2 - schema-driven)
+Extract data from RimWorld save files (v2.3 - Kaggle expansion)
 
 positional arguments:
   save_file             Path to .rws save file

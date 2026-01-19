@@ -15,7 +15,7 @@ We take the security of Docker Compose Cookbook seriously. If you have discovere
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please send an email to githubrepos@beardinthe.cloud. You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
+Instead, please send an email to <githubrepos@beardinthe.cloud>. You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 
 Please include the following information in your report:
 

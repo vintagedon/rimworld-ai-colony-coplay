@@ -26,9 +26,9 @@ related_documents:
 | Sessions | 1 |
 | Artifacts | 1 GDR report, 4 Python files, 2 output formats |
 
-**Objective:** Build a working RimWorld save file extractor using lxml streaming, fix broken faction relations, and extract core game state data.
+Objective: Build a working RimWorld save file extractor using lxml streaming, fix broken faction relations, and extract core game state data.
 
-**Outcome:** Functional extractor producing JSON + Markdown reports with colonists, factions, resources, research, animals, and game time from 22MB modded save files.
+Outcome: Functional extractor producing JSON + Markdown reports with colonists, factions, resources, research, animals, and game time from 22MB modded save files.
 
 ---
 
@@ -39,7 +39,8 @@ related_documents:
 └── README.md               # This file
 ```
 
-**Related Files:**
+Related Files:
+
 ```
 tools/extractor/
 ├── rimworld_extractor.py   # Main extractor script
@@ -133,16 +134,17 @@ Final extraction from `Deserters of the Rim#§#Hoeaia.rws`:
 
 ## 7. Next Phase
 
-**Handoff:** Extractor produces valid JSON/Markdown output. Ready for database schema design and watcher daemon.
+Handoff: Extractor produces valid JSON/Markdown output. Ready for database schema design and watcher daemon.
 
-**Next Steps:**
+Next Steps:
 
-1. **Schema Design** — PostgreSQL tables for snapshots, colonists, skills, resources, factions
-2. **Database Setup** — Create `rimworld_coplay` database on pgsql01
-3. **Watcher Daemon** — File watcher to auto-extract on new saves
-4. **MCP Integration** — CrystalDB MCP for Claude queries
+1. Schema Design — PostgreSQL tables for snapshots, colonists, skills, resources, factions
+2. Database Setup — Create `rimworld_coplay` database on pgsql01
+3. Watcher Daemon — File watcher to auto-extract on new saves
+4. MCP Integration — CrystalDB MCP for Claude queries
 
-**Deferred:**
+Deferred:
+
 - Storyteller/difficulty extraction
 - Gender extraction for modded saves
 - Needs data extraction refinement

@@ -25,9 +25,9 @@ related_documents:
 | Sessions | Multiple |
 | Artifacts | schema_discovery.py, rimworld_extractor_v2.py (v2.2) |
 
-**Objective:** Replace hardcoded path guessing with schema-driven extraction derived from actual save file analysis. Expand extraction to cover all meaningful game state.
+Objective: Replace hardcoded path guessing with schema-driven extraction derived from actual save file analysis. Expand extraction to cover all meaningful game state.
 
-**Outcome:** v2.2 extractor with 18+ extraction categories, dual-audience commenting, and validated output against 270-mod save files.
+Outcome: v2.2 extractor with 18+ extraction categories, dual-audience commenting, and validated output against 270-mod save files.
 
 ---
 
@@ -38,7 +38,8 @@ related_documents:
 └── README.md               # This file
 ```
 
-**Related Files:**
+Related Files:
+
 ```
 tools/extractor/
 ├── schema_discovery.py         # NEW: XML structure analysis tool
@@ -144,16 +145,17 @@ Final extraction from `the-fringe-benefit#§#Autosave-129.rws`:
 
 ## 7. Next Phase
 
-**Handoff:** Extractor v2.2 is complete with full extraction and dual-audience commenting. Ready for database integration or GitHub project frameout.
+Handoff: Extractor v2.2 is complete with full extraction and dual-audience commenting. Ready for database integration or GitHub project frameout.
 
-**Next Steps:**
+Next Steps:
 
-1. **M04: GitHub Project Frameout** — Issues, milestones, project board
-2. **M05: Database Schema** — PostgreSQL tables for pgsql01
-3. **M06: Watcher Daemon** — Auto-extract on new saves
-4. **M07: MCP Integration** — CrystalDB MCP for Claude queries
+1. M04: GitHub Project Frameout — Issues, milestones, project board
+2. M05: Database Schema — PostgreSQL tables for pgsql01
+3. M06: Watcher Daemon — Auto-extract on new saves
+4. M07: MCP Integration — CrystalDB MCP for Claude queries
 
-**Deferred:**
+Deferred:
+
 - Work Tab pawn name resolution
 - Drug/outfit policy extraction
 - Ideology/precept extraction
