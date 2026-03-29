@@ -1,8 +1,8 @@
 # Python Script Header Template
 
-> Template Version: 1.0  
-> Applies To: All `.py` files  
-> Last Updated: [YYYY-MM-DD]
+> Template Version: 2.0
+> Applies To: All `.py` files
+> Last Updated: 2026-03-29
 
 ---
 
@@ -14,9 +14,9 @@
 Script Name  : script_name.py
 Description  : [One-line description of what the script does]
 Repository   : rimworld-ai-colony-coplay
-Author       : VintageDon (https://github.com/vintagedon)
+Author       : VintageDon (https://github.com/vintagedon/)
 Created      : YYYY-MM-DD
-Link         : https://github.com/vintagedon/rimworld-ai-colony-coplay
+Link         : https://github.com/radioastronomyio/rimworld-ai-colony-coplay
 
 Description
 -----------
@@ -84,65 +84,12 @@ if __name__ == "__main__":
 
 ---
 
-## Section Comments
-
-Use banner comments to separate logical sections:
-
-```python
-# =============================================================================
-# Section Name
-# =============================================================================
-```
-
-Standard sections (in order):
-
-1. **Imports** — Standard library, third-party, local imports (in that order)
-2. **Configuration** — Constants, paths, settings
-3. **Functions** — Function and class definitions
-4. **Entry Point** — `if __name__ == "__main__":` block
-
----
-
-## Docstring Style
-
-Use NumPy-style docstrings for functions:
-
-```python
-def validate_file(
-    file_path: Path,
-    strict: bool = False
-) -> dict:
-    """
-    Validate a configuration file.
-
-    Parameters
-    ----------
-    file_path : Path
-        Path to the file.
-    strict : bool, optional
-        Enable strict validation mode. Default is False.
-
-    Returns
-    -------
-    dict
-        Validation result with keys: 'valid', 'errors', 'warnings'.
-
-    Raises
-    ------
-    FileNotFoundError
-        If file does not exist.
-    """
-    pass
-```
-
----
-
 ## Notes
 
 - Use `#!/usr/bin/env python3` for portability
 - Module docstring goes immediately after shebang
 - Keep Description line under 80 characters
-- Use present tense, active voice ("Validates..." not "This script validates...")
+- Use present tense, active voice ("Extracts..." not "This script extracts...")
+- Use dual-audience comments per [code-commenting-dual-audience.md](code-commenting-dual-audience.md)
 - Use `pathlib.Path` instead of string paths
 - Use type hints for all function parameters and return values
-- Follow PEP 8 style guide

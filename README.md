@@ -3,7 +3,7 @@
 title: "RimWorld AI Colony Co-Play"
 description: "External AI advisor for RimWorld colony management via save file analysis"
 author: "VintageDon"
-date: "2026-01-19"
+date: "2026-03-29"
 version: "0.4.0"
 status: "Development"
 tags:
@@ -14,7 +14,8 @@ tags:
   - tech: lxml
   - tech: xml-parsing
 related_documents:
-  - "[Memory Bank](.kilocode/rules/memory-bank/README.md)"
+  - "[Agent Context](AGENTS.md)"
+  - "[Schema KB](docs/rimworld-save-schema-kb.md)"
 ---
 -->
 
@@ -25,7 +26,7 @@ related_documents:
 [![Claude](https://img.shields.io/badge/Claude-Desktop-blueviolet)](https://claude.ai)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-![repo-banner](assets/repo-banner.jpg)
+![RimWorld AI Colony Co-Play Banner](assets/repo-banner.jpg)
 
 > External AI advisor that reads RimWorld colony state and provides strategic guidance through natural conversation.
 
@@ -52,7 +53,7 @@ The result is an AI companion that knows your colonists by name, remembers that 
 | M01: Ideation & Setup | ✅ Complete | Repository scaffolding, documentation |
 | M02: Extractor Phase 1 | ✅ Complete | Schema discovery, base extractor (v2.0) |
 | M03: Extractor Phase 2 | ✅ Complete | Full extraction suite, Work Tab, dual-audience comments (v2.2) |
-| M04: Extractor Phase 3 | ✅ Complete | Kaggle expansion — deep pawn, world state, containers (v2.3) |
+| M04: Extractor Phase 3 | ✅ Complete | Kaggle expansion: deep pawn, world state, containers (v2.3) |
 | M05: Database Storage | ⬜ Planned | PostgreSQL with pgvector + TimescaleDB |
 | M06: File Watcher | ⬜ Planned | Auto-extract on new saves |
 | M07: MCP Integration | ⬜ Planned | CrystalDB MCP for Claude queries |
@@ -116,7 +117,7 @@ The system operates as a read-only external observer, progressing toward a Conte
 
 ### Current Data Flow
 
-![architecture-section-infographi](assets/architecture-section-infographic.jpg)
+![Architecture Infographic](assets/architecture-section-infographic.jpg)
 
 ### Components
 
@@ -136,20 +137,28 @@ The system operates as a read-only external observer, progressing toward a Conte
 
 ```
 rimworld-ai-colony-coplay/
-├── 📂 assets/                # Project assets (images, diagrams)
-├── 📂 docs/                  # Documentation and standards
-├── 📂 game-saves/            # Colony save files
-│   └── the-fringe-benefit/   # Current test colony (public)
-├── 📂 mod/                   # C# mod source (Phase 2+)
-├── 📂 scratch/               # Planning documents
-├── 📂 shared/                # Cross-project utilities
-├── 📂 state/                 # Extracted game state
-│   └── snapshots/            # JSON/Markdown output
-├── 📂 tools/                 # Python tooling
-│   ├── extractor/            # Save file parser ✅
-│   └── watcher/              # File watcher (planned)
-├── 📂 work-logs/             # Development milestones
-└── 📂 .kilocode/             # Agent memory bank
+├── 📂 assets/                      # Project images, diagrams
+├── 📂 docs/
+│   ├── 📂 documentation-standards/ # Templates, tagging strategy
+│   ├── 📄 rimworld-save-schema-kb.md
+│   └── 📄 schema_*.md             # Schema discovery outputs
+├── 📂 game-saves/                  # Colony save files
+│   └── 📂 the-fringe-benefit/     # Current test colony (public)
+├── 📂 internal-files/              # Working documents
+├── 📂 mod/                         # C# mod source (Phase 2+)
+├── 📂 shared/                      # Cross-project utilities
+├── 📂 spec/                        # Specifications
+├── 📂 staging/                     # Staged work
+├── 📂 state/                       # Extracted game state
+│   └── 📂 snapshots/              # JSON/Markdown output
+├── 📂 tools/
+│   ├── 📂 extractor/              # Save file parser (v2.3) ✅
+│   └── 📂 watcher/                # File watcher (planned)
+├── 📂 work-logs/                   # Development milestones
+├── 📄 AGENTS.md                    # Agent context
+├── 📄 CLAUDE.md                    # Pointer to AGENTS.md
+├── 📄 LICENSE
+└── 📄 README.md                    # This file
 ```
 
 ---
@@ -167,7 +176,7 @@ rimworld-ai-colony-coplay/
 
 ```powershell
 # Clone repository
-git clone https://github.com/vintagedon/rimworld-ai-colony-coplay.git
+git clone https://github.com/radioastronomyio/rimworld-ai-colony-coplay.git
 cd rimworld-ai-colony-coplay
 
 # Install dependencies
@@ -203,22 +212,22 @@ Other RimWorld mods exploring AI integration:
 | [Legends Ledger](https://steamcommunity.com/sharedfiles/filedetails/?id=3642805704) | In-game world history | DF-style lore generation |
 | [Local AI Social](https://steamcommunity.com/sharedfiles/filedetails/?id=3413305419) | In-game, Ollama | Local LLM dialogue |
 
-Our approach differs: external advisory via save file analysis rather than in-game integration. These projects are complementary — use RimTalk for colonist chatter and our system for strategic advisory.
+Our approach differs: external advisory via save file analysis rather than in-game integration. These projects are complementary; use RimTalk for colonist chatter and our system for strategic advisory.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- Ludeon Studios — RimWorld and its moddable architecture
-- Anthropic — Claude and the MCP ecosystem
-- lxml Project — Efficient XML parsing
+- Ludeon Studios for RimWorld and its moddable architecture
+- Anthropic for Claude and the MCP ecosystem
+- lxml Project for efficient XML parsing
 
 ---
 
-Last Updated: 2026-01-19 | M04 Complete | Extractor v2.3
+Last Updated: 2026-03-29 | M04 Complete | Extractor v2.3

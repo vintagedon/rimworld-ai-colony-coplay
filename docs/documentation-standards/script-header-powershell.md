@@ -1,8 +1,8 @@
 # PowerShell Script Header Template
 
-> Template Version: 1.0  
-> Applies To: All `.ps1` files  
-> Last Updated: [YYYY-MM-DD]
+> Template Version: 2.0
+> Applies To: All `.ps1` files
+> Last Updated: 2026-03-29
 
 ---
 
@@ -19,7 +19,7 @@
 
 .NOTES
     Repository  : rimworld-ai-colony-coplay
-    Author      : VintageDon (https://github.com/vintagedon)
+    Author      : VintageDon (https://github.com/vintagedon/)
     Created     : YYYY-MM-DD
 
 .EXAMPLE
@@ -33,7 +33,7 @@
     [Description of what this invocation does]
 
 .LINK
-    https://github.com/vintagedon/rimworld-ai-colony-coplay
+    https://github.com/radioastronomyio/rimworld-ai-colony-coplay
 #>
 
 # =============================================================================
@@ -70,69 +70,9 @@
 
 ---
 
-## Section Comments
-
-Use banner comments to separate logical sections:
-
-```powershell
-# =============================================================================
-# Section Name
-# =============================================================================
-```
-
-Standard sections (in order):
-
-1. **Configuration** — Variables, paths, settings
-2. **Functions** — Helper function definitions (if any)
-3. **Execution** — Main script logic
-
----
-
-## Example: Minimal Script
-
-```powershell
-<#
-.SYNOPSIS
-    Validates configuration files across all subdirectories.
-
-.DESCRIPTION
-    Scans all subdirectories and validates that each config file
-    is syntactically correct. Outputs a summary of validation results.
-
-.NOTES
-    Repository  : rimworld-ai-colony-coplay
-    Author      : VintageDon (https://github.com/vintagedon)
-    Created     : YYYY-MM-DD
-
-.EXAMPLE
-    .\validate-configs.ps1
-
-    Validates all configuration files in the repository.
-
-.LINK
-    https://github.com/vintagedon/rimworld-ai-colony-coplay
-#>
-
-# =============================================================================
-# Configuration
-# =============================================================================
-
-$RepoRoot = Split-Path -Parent $PSScriptRoot
-
-# =============================================================================
-# Execution
-# =============================================================================
-
-Get-ChildItem -Path $RepoRoot -Recurse -Filter "*.config" | ForEach-Object {
-    Write-Host "Validating: $($_.FullName)"
-    # Validation logic here
-}
-```
-
----
-
 ## Notes
 
-- PowerShell comment-based help (`.SYNOPSIS`, `.DESCRIPTION`, etc.) enables `Get-Help script-name.ps1`
+- PowerShell comment-based help enables `Get-Help script-name.ps1`
 - Keep `.SYNOPSIS` under 80 characters
-- Use present tense, active voice ("Validates..." not "This script validates...")
+- Use present tense, active voice ("Extracts..." not "This script extracts...")
+- See [code-commenting-dual-audience.md](code-commenting-dual-audience.md) for comment conventions

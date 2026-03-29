@@ -2,9 +2,9 @@
 ---
 title: "Documentation Standards"
 description: "Templates and guidelines for project documentation"
-author: "VintageDon"
-date: "2026-01-17"
-version: "1.0"
+author: "VintageDon (https://github.com/vintagedon/)"
+date: "2026-03-28"
+version: "2.0"
 status: "Active"
 tags:
   - type: directory-readme
@@ -22,15 +22,17 @@ Templates for RAG-optimized documentation. Start lean, expand as needed.
 
 ```
 documentation-standards/
-├── primary-readme-template.md      # Repository root README
-├── interior-readme-template.md     # Directory README
-├── general-kb-template.md          # Standalone documents
-├── worklog-readme-template.md      # Work-log milestone directories
-├── tagging-strategy.md             # How to build a tagging vocabulary
-├── script-header-python.md         # Python script header
-├── script-header-shell.md          # Bash script header
-├── script-header-powershell.md     # PowerShell script header
-└── README.md                       # This file
+├── primary-readme-template.md       # Repository root README
+├── interior-readme-template.md      # Directory README
+├── general-kb-template.md           # Standalone documents
+├── worklog-readme-template.md       # Work log entries
+├── code-commenting-dual-audience.md # Code comment methodology
+├── writing-style-guide.md           # Prose conventions and AI tell suppression
+├── tagging-strategy.md              # Controlled vocabulary for tags
+├── script-header-python.md          # Python script header
+├── script-header-shell.md           # Bash script header
+├── script-header-powershell.md      # PowerShell script header
+└── README.md                        # This file
 ```
 
 ---
@@ -43,8 +45,8 @@ documentation-standards/
 |----------|---------|
 | [primary-readme-template.md](primary-readme-template.md) | Repository root README.md |
 | [interior-readme-template.md](interior-readme-template.md) | Any directory that needs a README |
-| [general-kb-template.md](general-kb-template.md) | Standalone documents (guides, specs, reports) |
-| [worklog-readme-template.md](worklog-readme-template.md) | Milestone directories in `work-logs/` |
+| [general-kb-template.md](general-kb-template.md) | Standalone documents (guides, specs, reports, runbooks) |
+| [worklog-readme-template.md](worklog-readme-template.md) | Date-based work log entries in `work-logs/` |
 
 ### Script Header Templates
 
@@ -58,7 +60,9 @@ documentation-standards/
 
 | Document | Use For |
 |----------|---------|
-| [tagging-strategy.md](tagging-strategy.md) | Building a controlled vocabulary for YAML frontmatter |
+| [tagging-strategy.md](tagging-strategy.md) | Controlled vocabulary for YAML frontmatter tags |
+| [code-commenting-dual-audience.md](code-commenting-dual-audience.md) | Writing comments for humans and AI agents |
+| [writing-style-guide.md](writing-style-guide.md) | Prose conventions, AI tell suppression |
 
 ---
 
@@ -66,9 +70,9 @@ documentation-standards/
 
 ### RAG Infrastructure (Always Keep)
 
-- **YAML frontmatter** — enables retrieval and filtering
-- **Semantic numbering** — predictable section structure
-- **Preserved gaps** — if you omit section 4, keep numbering as 1, 2, 3, 5 (never renumber)
+- **YAML frontmatter** enables retrieval and filtering
+- **Semantic numbering** provides predictable section structure
+- **Preserved gaps** maintain stability: if you omit section 4, keep numbering as 1, 2, 3, 5 (never renumber)
 
 ### Bottom-Up Approach
 
@@ -87,9 +91,7 @@ documentation-standards/
 Is it the repository root README?
 ├─ Yes → primary-readme-template.md
 └─ No: Is it a directory README?
-        ├─ Yes: Is it a work-logs milestone?
-        │       ├─ Yes → worklog-readme-template.md
-        │       └─ No  → interior-readme-template.md
+        ├─ Yes → interior-readme-template.md
         └─ No: Is it a standalone document?
                 └─ Yes → general-kb-template.md
 ```
